@@ -1,0 +1,44 @@
+cmake_minimum_required (VERSION 3.23)
+
+get_filename_component(MYNAME ${CMAKE_CURRENT_LIST_DIR} NAME)
+string(REPLACE " " "_" MYNAME ${MYNAME})
+project(${MYNAME} C CXX)
+
+# Building options
+set(GSCM_VERSION_MAJOR            1 )
+set(GSCM_VERSION_MINOR            0 )
+set(CMAKE_CXX_STANDARD            23)
+set(CMAKE_CXX_STANDARD_REQUIRED   OFF)
+set(CMAKE_CXX_EXTENSIONS          OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_COMPILER_WORKS      1)
+set(CMAKE_CONFIGURATION_TYPES "Release" CACHE STRING "" FORCE )
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type: Debug, Release, RelWithDebInfo, MinSizeRel" FORCE)
+endif()
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+message("CMAKE_BINARY_DIR = ${CMAKE_BINARY_DIR}")
+
+if (MSVC)
+    set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE}   /MD")
+    set(CMAKE_C_FLAGS_DEBUG     "${CMAKE_C_FLAGS_DEBUG}     /MDd")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   /MDd")
+    set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  /NODEFAULTLIB:LIBCMT")
+endif()
+
+# Cmake dependencies
+include( dependencies/cmake/CPM.cmake )
+include( dependencies/cmake/tools.cmake )
+include( dependencies/cmake/clang-format.cmake )
+include( dependencies/cmake/cppcheck.cmake )
+include( dependencies/cmake/glm.cmake )
+include( dependencies/cmake/glfw.cmake )
+
+# Build
+add_subdirectory(source)
+
+

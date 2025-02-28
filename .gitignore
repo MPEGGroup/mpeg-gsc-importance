@@ -1,0 +1,11 @@
+/build/
+/dependencies/glm
+/dependencies/glfw
+/dependencies/glfw
+
+
+
+# template
+*.rgb
+*.ply
+*.mp4

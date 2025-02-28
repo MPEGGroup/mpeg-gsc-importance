@@ -1,93 +1,131 @@
-# mpeg-gsc-metrics
+# MPEG Gaussian splat compression metrics 
 
+Mpeg-gsc-metric computes image-based metrics between two sequences of 3D gaussian splat objects.
 
+# Cloning and Building Instructions
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
+The source code can be obtained by: 
 ```
-cd existing_repo
-git remote add origin https://git.mpeg.expert/MPEG/3dgh/GSC/gsc-software/mpeg-gsc-metrics.git
-git branch -M main
-git push -uf origin main
+git clone https://git.mpeg.expert/MPEG/3dgh/GSC/gsc-software/mpeg-gsc-metrics.git`
 ```
 
-## Integrate with your tools
+The software supports Windows, MacOs and Linux operating systems. Compilation can be done as follows:
+* Linux:
+  * to build use the command `build.sh`.
+  * to clean all object use the command `clear.sh`.
+* Windows:
+  * to build use the CMAKE command or `build.sh` or open MSVC project ./build/Release/PccAppRenderer.sln
+  * to clean all object use the command `clear.sh`.
+* MacOs:
+  * to build use the CMAKE command or `build.sh` or open Xcode.
+  * to clean all object use the command `clear.sh`.
 
-- [ ] [Set up project integrations](https://git.mpeg.expert/MPEG/3dgh/GSC/gsc-software/mpeg-gsc-metrics/-/settings/integrations)
+Cmake commands can be used to build software:
 
-## Collaborate with your team
+``` 
+cd mpeg-gsc-metric
+mkdir build 
+cd ./build/
+cmake .. 
+cmake --build . --config Release --parallel 20 
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+The command `clear.sh all` can be used to remove all dependencies.
 
-## Test and Deploy
 
-Use the built-in continuous integration in GitLab.
+# Depensencies
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+Mpeg-gsc-metric project uses:
+- OpenGL  
+- [GLFW](https://github.com/glfw/glfw)
+- [OpenGL Mathematics(GLM)](https://github.com/g-truc/glm.git)
+- program-options-lite.
 
-***
+# Usage 
 
-# Editing this README
+The mpeg-gsc-metric input parameters are listed below:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+| --key=default value | Usage |
+|-----|-----|
+| **Global**            | |
+| -h, --help=           | Print this help message <br> |
+| -c, --config=         | Parse configuration file <br> |
+| -v, --verbose=0       | Verbose <br> |
+| **Input paths**       | |
+| -a, --source=""       | Source 3DGS path <br> |
+| -b, --decode=""       | Decode 3DGS path <br> |
+| **Sequence information** | |
+| -i, --startFrame=0    | First frame number <br> |
+| -f, --frameCount=1    | Number of frames <br> |
+| --width=1024          | Width of the generated images <br> |
+| --height=768          | Height of the generated images <br> |
+| **Viewpoints**        | |
+| --viewpoint=""        | Viewpoint path <br> |
+| -n, --numPoints=16    | Number of viewpoints <br> |
+| --display=0           | Show 3D model and viewpoints <br> |
+| --saveViewpoints=0    | Save the generated viewpoints <br> |
+| **Rendering**         | |
+| --cpu=0               | Use CPU rendering <br> |
+| --float=0             | Use floatting point images <br> |
+| **Options**           | |
+| -s, --save=0          | Save generated videos <br> |
 
-## Suggestions for a good README
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## Examples
 
-## Name
-Choose a self-explaining name for your project.
+The next section presents some example of command line used to compute metric. 
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Automatic metric between two 3DGS files
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```
+$ ./build/Release/bin/Release/mpeg-gsc-metrics.exe \
+  -a src.ply \
+  -b dec.ply
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Automatic viewpoints around the objects
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```
+$ ./build/Release/bin/Release/mpeg-gsc-metrics.exe \
+     -a src_%04d.ply \
+     -b dec_%04d.ply \
+     -i 0 \
+     -f 32 \
+     -n 16 \
+     --cpu 1 \
+     -s \
+     -v 
+Metric : MSE RGB =     0.000000     0.000000     0.000000 PSNR RGB =   999.990000   999.990000   999.990000 MSE YUV =     0.000000     0.000000     0.000000 PSNR YUV =   999.990000   999.990000   999.990000
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### Loaded viewpoints
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```
+$ ./build/Release/bin/Release/mpeg-gsc-metrics.exe \
+     -a src.ply \
+     -b dec.ply 
+     --viewpoints ./config/viewpoints.txt
+     --cpu 1 \
+     -v  
+Metric : MSE RGB =     0.000000     0.000000     0.000000 PSNR RGB =   999.990000   999.990000   999.990000 MSE YUV =     0.000000     0.000000     0.000000 PSNR YUV =   999.990000   999.990000   999.990000
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+# Notes
+Please, don't hesitate to report me any issues with the renderer by the GitLab Issue Tracker or directly by [email](mailto:jricard@global.tencent.com).
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# Licence 
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+The copyright in this software is being made available under the BSD Licence, included below. This software may be subject to other third party and contributor rights, including patent rights, and no such rights are granted under this licence. 
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Copyright (c) 2025, ISO/IEC All rights reserved. 
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+* Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer. 
+* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. 
+* Neither the name of the ISO/IEC nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission. 
 
-## License
-For open source projects, say how it is licensed.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+# Contact 
+
+* [Julien Ricard](mailto:jricard@global.tencent.com).

@@ -1,0 +1,37 @@
+set( DIR ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw )
+if( NOT EXISTS ${DIR} )
+  CPMAddPackage( NAME             glfw
+                GIT_REPOSITORY    https://github.com/glfw/glfw.git
+                GIT_TAG           3.4
+                SOURCE_DIR        ${DIR} 
+                DOWNLOAD_ONLY     YES)
+endif()
+
+## GLFW
+SET(ENABLE_GLFW 1 CACHE BOOL "Enable GLFW" )
+IF(ENABLE_GLFW)
+  SET( GLFW_BUILD_EXAMPLES          OFF CACHE INTERNAL "" FORCE )
+  SET( GLFW_BUILD_TESTS             OFF CACHE INTERNAL "" FORCE )
+  SET( GLFW_BUILD_DOCS              OFF CACHE INTERNAL "" FORCE )
+  SET( GLFW_INSTALL                 OFF CACHE INTERNAL "" FORCE )
+  SET( USE_MSVC_RUNTIME_LIBRARY_DLL OFF CACHE INTERNAL "" FORCE )
+  ADD_SUBDIRECTORY( ${DIR} )
+  ADD_DEFINITIONS( -DGLFW_ENABLED )
+  SET( GLFW_INCLUDE_DIR ${DIR}/include )
+  SET( GLAD_INCLUDE_DIR ${DIR}/deps )
+  IF( WIN32 )
+    SET( GLFW_LIBRARIES glfw3 )
+    SET( GLFW_LIBRARY_DIR ${CMAKE_SOURCE_DIR}/lib/${CMAKE_CONFIGURATION_TYPES} )  
+  ELSEIF( APPLE )
+    FIND_LIBRARY( COCOA_LIBRARY     Cocoa     )
+    FIND_LIBRARY( COREVIDEO_LIBRARY CoreVideo )
+    FIND_LIBRARY( IOKIT_LIBRARY     IOKit     )   
+    SET( GLFW_LIBRARIES glfw3 ${COCOA_LIBRARY} ${COREVIDEO_LIBRARY} ${IOKIT_LIBRARY} )
+    SET( GLFW_LIBRARY_DIR ${CMAKE_SOURCE_DIR}/lib )  
+  ELSE()      
+    SET( GLFW_LIBRARIES glfw3 Xxf86vm X11 dl Xi Xrandr Xinerama Xcursor )
+    SET( GLFW_LIBRARY_DIR ${CMAKE_SOURCE_DIR}/lib )  
+  ENDIF()
+ELSE()
+  MESSAGE( FATAL_ERROR "GLFW is requiered " )
+ENDIF()

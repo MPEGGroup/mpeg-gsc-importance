@@ -1,0 +1,7 @@
+[
+  {
+    "key": "f7",
+    "command": "cmake.build",
+    "when": "cmake:enabled"
+  }
+]
