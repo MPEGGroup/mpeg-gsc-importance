@@ -46,21 +46,24 @@
 
 // Parse input command line
 struct Parameters {
-  bool        verbose_        = false;
-  bool        help_           = false;
-  bool        useCPU_         = false;
-  bool        useFloat_       = false;
-  bool        display_        = false;
-  bool        saveViewpoints_ = false;
-  bool        save_           = false;
-  std::string sourcePath_     = "";
-  std::string decodePath_     = "";
-  std::string viewpointPath_  = "";
-  int32_t     startFrame_     = 0;
-  int32_t     frameCount_     = 1;
-  int32_t     numPoints_      = 16;
-  int32_t     width_          = 1024;
-  int32_t     height_         = 768;
+  bool        verbose_           = false;
+  bool        help_              = false;
+  bool        useCPU_            = false;
+  bool        useFloat_          = false;
+  bool        display_           = false;
+  bool        saveViewpoints_    = false;
+  bool        save_              = false;
+  bool        useCameraPosition_ = false;
+  bool        compareCpuGpu_     = false;
+  std::string sourcePath_        = "";
+  std::string decodePath_        = "";
+  std::string viewpointPath_     = "";
+  int32_t     startFrame_        = 0;
+  int32_t     frameCount_        = 1;
+  int32_t     numPoints_         = 16;
+  int32_t     onlyViewpoint_     = -1;
+  int32_t     width_             = 1024;
+  int32_t     height_            = 768;
 
   bool parse( int32_t argc, char* argv[] ) {
     namespace po = df::program_options_lite;
@@ -68,58 +71,72 @@ struct Parameters {
     /* clang-format off */
     opts.addOptions()
       (po::Section("Common"))
-        ("h,help",            help_,            false,            "This help text")
-        ("c,config",          po::parseConfigFile,                "Configuration file name")
-        ("v,verbose",         verbose_,         verbose_,         "Verbose")
-      ( po::Section("Input paths") )   
-        ( "a,source",         sourcePath_,      sourcePath_,      "Source 3DGS path" )
-        ( "b,decode",         decodePath_,      decodePath_,      "Decode 3DGS path" )
+        ("h,help",            help_,              false,              "This help text")
+        ("c,config",          po::parseConfigFile,                    "Configuration file name")
+        ("v,verbose",         verbose_,           verbose_,           "Verbose")
+      ( po::Section("Input paths") )      
+        ( "a,source",         sourcePath_,        sourcePath_,        "Source 3DGS path" )
+        ( "b,decode",         decodePath_,        decodePath_,        "Decode 3DGS path" )
 
-      (po::Section("Sequence information"))   
-        ("i,startFrame",      startFrame_,      startFrame_,      "First frame number")
-        ("f,frameCount",      frameCount_,      frameCount_,      "Number of frames")
-        ("width",             width_,           width_,           "Width of the generated images")
-        ("height",            height_,          height_,          "Height of the generated images")
+      (po::Section("Sequence information"))       
+        ("i,startFrame",      startFrame_,        startFrame_,        "First frame number")
+        ("f,frameCount",      frameCount_,        frameCount_,        "Number of frames")
+        ("width",             width_,             width_,             "Width of the generated images")
+        ("height",            height_,            height_,            "Height of the generated images")
       
-      (po::Section("Viewpoints"))
-        ("viewpoint",         viewpointPath_,   viewpointPath_,   "Viewpoint path")
-        ("n,numPoints",       numPoints_,       numPoints_,       "Number of viewpoints")
-        ("display",           display_,         display_,         "Show 3D model and viewpoints")
-        ("saveViewpoints",    saveViewpoints_,  saveViewpoints_,  "Save the generated viewpoints")
+      (po::Section("Viewpoints"))        
+        ("viewpoint",         viewpointPath_,     viewpointPath_,     "Viewpoint path used to load viewpoints")
+        ("useCameraPosition", useCameraPosition_, useCameraPosition_, "Use camera position stored in ply file")
+        ("n,numPoints",       numPoints_,         numPoints_,         "Create N random viewpoints")
+        ("display",           display_,           display_,           "Show 3D model and viewpoints")
+        ("saveViewpoints",    saveViewpoints_,    saveViewpoints_,    "Save the generated viewpoints")
+        ("onlyViewpoint",     onlyViewpoint_,     onlyViewpoint_,     "Only render the viewpoint")
 
-      (po::Section("Rendering"))
-        ("cpu",               useCPU_,          useCPU_,          "Use CPU rendering")
-        ("float",             useFloat_,        useFloat_,        "Use floatting point images")
+      (po::Section("Rendering"))  
+        ("cpu",               useCPU_,            useCPU_,            "Use CPU rendering")
+        ("float",             useFloat_,          useFloat_,          "Use floatting point images")
+        ("compareCpuGpu",     compareCpuGpu_,     compareCpuGpu_,     "Compare CPU/GPU rendering")
 
-      ( po::Section("Options") )     
-        ("s,save",            save_,            save_,            "Save generated videos")
+      ( po::Section("Options") )      
+        ("s,save",            save_,              save_,              "Save generated videos")
       ;
 
     /* clang-format on */
-
     po::setDefaults( opts );
     po::ErrorReporter             err;
     const std::list<const char*>& argv_unhandled = po::scanArgv( opts, argc, (const char**)argv, err );
-
-    for ( const auto* const arg : argv_unhandled ) { err.warn() << "Unhandled argument ignored: " << arg << '\n'; }
-
-    if ( argc == 1 || help_ || verbose_ || sourcePath_.empty() || decodePath_.empty() ) {
-      std::cout << "usage: " << argv[0] << " [arguments...] \n\n";
+    if ( argc == 1 || help_ || sourcePath_.empty() || decodePath_.empty() || argv_unhandled.size() != 0 ||
+         err.is_errored ) {
+      std::cout << "\nusage: " << argv[0] << " [arguments...] \n";
       po::doHelp( std::cout, opts, 78 );
-
+      std::cout << "\n";
       if ( sourcePath_.empty() || decodePath_.empty() ) printf( "Warning: input files are not defined. \n" );
-      return !verbose_;
+      for ( const auto* const arg : argv_unhandled ) { err.warn() << "Unhandled argument ignored: " << arg << '\n'; }
+      if ( err.is_errored ) err.error() << "Unhandled argument \n";
+      return 1;
     }
-
     if ( useFloat_ && save_ ) {
       printf(
           "Warning: Floating point images are not compatible with the recording option, disabling the creation of "
           "output videos\n" );
       save_ = false;
     }
+    if ( ( !useCameraPosition_ ) && viewpointPath_.empty() && numPoints_ == 0 ) {
+      printf( "Viewpoints configuration is not correclty defined \n" );
+      return 1;
+    }
     return 0;
   }
 };
+
+std::string getOuputName( const std::string& path ) {
+  auto str = getRemoveExtension( path );
+  auto pos = str.find( '%' );
+  if ( pos == 0 ) return "video";
+  if ( pos != std::string::npos )
+    if ( str[pos - 1] == '_' ) pos = pos - 1;
+  return ( pos == std::string::npos ) ? str : str.substr( 0, pos );
+}
 
 int main( int32_t argc, char* argv[] ) {
   printf( "MPEG GSC metric version %s \n", ::gscm::version );
@@ -130,31 +147,59 @@ int main( int32_t argc, char* argv[] ) {
 
   Viewpoints viewpoints;
   if ( !params.viewpointPath_.empty() ) { viewpoints.read( params.viewpointPath_ ); }
-  Image<uint8_t> imageI[2];
-  Image<float>   imageF[2];
-  if ( params.useFloat_ )
-    for ( int32_t i = 0; i < 2; i++ ) imageF[i].resize( params.width_, params.height_ );
-  else
-    for ( int32_t i = 0; i < 2; i++ ) imageI[i].resize( params.width_, params.height_ );
-  Video<uint8_t> video[2];
-  Metric         metric;
-  Rasterizer     rasterizer( params.useCPU_ );
-  Timer          timer;
+
+  auto              imageFloat = std::array<Image<float>, 2>{ Image<float, 3>( params.width_, params.height_ ),
+                                                 Image<float, 3>( params.width_, params.height_ ) };
+  auto              imageUint8 = std::array<Image<uint8_t>, 2>{ Image<uint8_t, 3>( params.width_, params.height_ ),
+                                                   Image<uint8_t, 3>( params.width_, params.height_ ) };
+  auto              imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
+                                                    Image<uint8_t, 1>( params.width_, params.height_ ) };
+  Video<uint8_t, 1> videoOcm[2];
+  Video<uint8_t, 3> videoImg[2];
+  Metric            metric;
+  Rasterizer        rasterizer( params.useCPU_ ), rasterizerCpu( true ), rasterizerGpu( false );
+  Timer             timer;
+
   for ( int32_t frameIndex = 0; frameIndex < params.frameCount_; frameIndex++ ) {
     // Load pointclouds
     Pointcloud pc[2];
     timer.tic( "Read" );
-    if ( !pc[0].read( params.sourcePath_, params.startFrame_ + frameIndex ) ) return 1;
-    if ( !pc[1].read( params.decodePath_, params.startFrame_ + frameIndex ) ) return 1;
+    if ( !pc[0].read( params.sourcePath_, params.startFrame_ + frameIndex, params.verbose_ ) ) return 1;
+    if ( !pc[1].read( params.decodePath_, params.startFrame_ + frameIndex, params.verbose_ ) ) return 1;
     timer.toc( "Read", params.verbose_ );
     if ( params.verbose_ )
       for ( int32_t i = 0; i < 2; i++ ) pc[i].trace();
 
     // Create viewpoint list
     if ( viewpoints.size() == 0 ) {
-      auto [minBound, maxBound] = pc[0].getBoundingBox();
-      viewpoints.create( params.numPoints_, ( maxBound + minBound ) * 0.5f );
-      if ( params.saveViewpoints_ ) viewpoints.write( "viewpoint.txt" );
+      if ( params.useCameraPosition_ ) {
+        auto& cameraPosition = pc[0].getCameraPosition();
+        if ( cameraPosition.size() == 0 ) {
+          printf( "Error: camera position is not correclty defined in src ply files \n" );
+          return 1;
+        }
+        viewpoints.resize( cameraPosition.size() );
+        for ( size_t i = 0; i < cameraPosition.size(); i++ ) {
+          const auto& el = cameraPosition[i];
+          viewpoints[i].set( el.pos(), el.view(), el.up() );
+          if ( params.verbose_ ) el.log();
+        }
+      } else {
+        auto [minBound, maxBound] = pc[0].getBoundingBox();
+        // viewpoints.create( params.numPoints_, ( maxBound + minBound ) * 0.5f );
+        auto center = ( maxBound + minBound ) * 0.5f;
+        logVec3( "minBound", minBound );
+        logVec3( "maxBound", maxBound );
+        logVec3( "center", center );
+        viewpoints.create( params.numPoints_, center );
+        if ( params.saveViewpoints_ ) viewpoints.write( "viewpoint.txt" );
+        if ( params.verbose_ ) {
+          printf( "Create N random points N = %d \n", params.numPoints_ );
+          logVec3( "minBound", minBound );
+          logVec3( "maxBound", maxBound );
+          viewpoints.trace();
+        }
+      }
     }
     if ( params.display_ ) {
       viewpoints.trace();
@@ -165,6 +210,7 @@ int main( int32_t argc, char* argv[] ) {
     // Rendering
     for ( size_t viewpointIndex = 0; viewpointIndex < viewpoints.size(); viewpointIndex++ ) {
       auto& viewpoint = viewpoints[viewpointIndex];
+      if ( params.onlyViewpoint_ != -1 && viewpointIndex != params.onlyViewpoint_ ) continue;
       if ( params.verbose_ ) {
         printf( "Frame %3d / %3d: viewpoints %3zu / %3zu \n", frameIndex, params.frameCount_, viewpointIndex,
                 viewpoints.size() );
@@ -172,23 +218,38 @@ int main( int32_t argc, char* argv[] ) {
       }
       // Rasterize
       timer.tic( "Rasterize" );
-      for ( int32_t i = 0; i < 2; i++ )
-        if ( params.useFloat_ )
-          rasterizer.render( pc[i], viewpoint, imageF[i] );
-        else
-          rasterizer.render( pc[i], viewpoint, imageI[i] );
+      if ( !params.compareCpuGpu_ ) {
+        for ( int32_t i = 0; i < 2; i++ )
+          if ( params.useFloat_ )
+            rasterizer.render( pc[i], viewpoint, imageFloat[i], imageOcm[i] );
+          else
+            rasterizer.render( pc[i], viewpoint, imageUint8[i], imageOcm[i] );
+      } else {
+        if ( params.useFloat_ ) {
+          rasterizerCpu.render( pc[0], viewpoint, imageFloat[0], imageOcm[0] );
+          rasterizerGpu.render( pc[1], viewpoint, imageFloat[1], imageOcm[1] );
+        } else {
+          rasterizerCpu.render( pc[0], viewpoint, imageUint8[0], imageOcm[0] );
+          rasterizerGpu.render( pc[1], viewpoint, imageUint8[1], imageOcm[1] );
+        }
+      }
       timer.toc( "Rasterize", params.verbose_ );
 
       // Save
-      if ( params.save_ )
-        for ( int32_t i = 0; i < 2; i++ ) video[i].add( imageI[i] );
+      if ( params.save_ ) {
+        if ( params.useFloat_ )
+          for ( int32_t i = 0; i < 2; i++ ) videoImg[i].add( imageFloat[i] );
+        else
+          for ( int32_t i = 0; i < 2; i++ ) videoImg[i].add( imageUint8[i] );
+        for ( int32_t i = 0; i < 2; i++ ) videoOcm[i].add( imageOcm[i] );
+      }
 
       // Metric
       timer.tic( "Metric" );
       if ( params.useFloat_ )
-        metric.compute( imageF[0], imageF[1] );
+        metric.compute( imageFloat[0], imageFloat[1] );
       else
-        metric.compute( imageI[0], imageI[1] );
+        metric.compute( imageUint8[0], imageUint8[1] );
       timer.toc( "Metric", params.verbose_ );
     }
   }
@@ -199,8 +260,34 @@ int main( int32_t argc, char* argv[] ) {
 
   // Save
   if ( !params.useFloat_ && params.save_ ) {
-    video[0].save( getRemoveExtension( getBasename( params.sourcePath_ ) ) + "_video" );
-    video[1].save( getRemoveExtension( getBasename( params.decodePath_ ) ) + "_video" );
+    auto srcName = getOuputName( getBasename( params.sourcePath_ ) );
+    auto decName = getOuputName( getBasename( params.decodePath_ ) );
+    auto suffix  = getOuputName( params.decodePath_ ) +
+                  ( params.compareCpuGpu_ ? "_cpu_vs_gpu" : ( params.useCPU_ ? "_cpu" : "_gpu" ) );
+
+    // Creation of butterfly and difference videos
+    auto videoImgBty = Video<uint8_t>( videoImg[0], videoImg[1], true );
+    auto videoImgDif = videoImg[0] - videoImg[1];
+    auto videoOcmDif = videoOcm[0] - videoOcm[1];
+
+    // Add overlay
+    videoImg[0].draw( "Source", 0, 8 );
+    videoImg[0].draw( srcName, 0, 24 );
+    videoImg[1].draw( "Decode", 0, 8 );
+    videoImg[1].draw( decName, 0, 24 );
+    videoImgBty.draw( "Source", 0, 8 );
+    videoImgBty.draw( srcName, 0, 24 );
+    videoImgBty.draw( "Decode", params.width_ - 8, 8, true );
+    videoImgBty.draw( decName, params.width_ - 8, 24, true );
+
+    // Save video
+    videoImg[0].save( suffix + "_img_src" );
+    videoImg[1].save( suffix + "_img_dec" );
+    videoOcm[0].save( suffix + "_ocm_src" );
+    videoOcm[1].save( suffix + "_ocm_dec" );
+    videoImgDif.save( suffix + "_img_dif" );
+    videoOcmDif.save( suffix + "_ocm_dif" );
+    videoImgBty.save( suffix + "_img_bty" );
   }
 
   fflush( stdout );

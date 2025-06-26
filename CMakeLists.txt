@@ -35,8 +35,8 @@ include( dependencies/cmake/CPM.cmake )
 include( dependencies/cmake/tools.cmake )
 include( dependencies/cmake/clang-format.cmake )
 include( dependencies/cmake/cppcheck.cmake )
-include( dependencies/cmake/glm.cmake )
 include( dependencies/cmake/glfw.cmake )
+include( dependencies/cmake/glm.cmake )
 
 # Build
 add_subdirectory(source)

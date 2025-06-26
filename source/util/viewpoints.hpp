@@ -38,6 +38,7 @@
 #include "camera.hpp"
 
 class Pointcloud;
+class CameraPosition;
 
 class Viewpoint {
  public:
@@ -70,19 +71,27 @@ class Viewpoints {
 
   void create( int numPoints, glm::vec3 center, float radius = 5.f ) {
     viewpoints_.resize( numPoints );
-    const float phiIncrement = glm::pi<float>() * ( 3.0f - glm::sqrt( 5.0f ) );
-    const float zIncrement   = 2.0f / numPoints;
+    if ( numPoints == 1 ) {
+      viewpoints_[0].set( center + glm::vec3( radius, 0.0f, 0.0f ), center, glm::vec3( 0.0f, 1.0f, 0.0f ) );
+      return;
+    }
+
+    const float goldenAngle = glm::pi<float>() * ( 3.0f - glm::sqrt( 5.0f ) );
     for ( int i = 0; i < numPoints; ++i ) {
-      float     z        = 1.0f - i * zIncrement;
-      float     radiusXY = glm::sqrt( 1.0f - z * z );
-      float     phi      = i * phiIncrement;
-      glm::vec3 pos =
-          center + glm::vec3( radius * radiusXY * glm::cos( phi ), radius * radiusXY * glm::sin( phi ), radius * z );
-      glm::vec3 view = glm::normalize( center - pos );
-      glm::vec3 up   = glm::vec3( 0.0f, -1.0f, 0.0f );
+      float     z   = 1.0f - ( 2.0f * i ) / ( numPoints - 1 );
+      float     r   = glm::sqrt( 1.0f - z * z );
+      float     phi = i * goldenAngle;
+      glm::vec3 pos = center + radius * glm::vec3( r * glm::cos( phi ), r * glm::sin( phi ), z );
+      printf( "phi = %f => pos = %f %f %f \n", phi, pos.x, pos.y, pos.z );
+      glm::vec3 view    = center;
+      glm::vec3 worldUp = glm::vec3( 0.0f, 1.0f, 0.0f );
+      glm::vec3 right   = glm::normalize( glm::cross( worldUp, view ) );
+      glm::vec3 up      = glm::cross( view, right );
       viewpoints_[i].set( pos, view, up );
     }
   }
+
+  void             resize( size_t size ) { viewpoints_.resize( size ); }
   auto             size() const { return viewpoints_.size(); }
   auto             begin() { return viewpoints_.begin(); }
   auto             end() { return viewpoints_.end(); }
@@ -136,11 +145,13 @@ class Viewpoints {
   static void keyCallback( GLFWwindow* window, int key, int scancode, int action, int mods );
 
  private:
-  std::vector<Viewpoint> viewpoints_;
-  Camera                 camera_;
-  static Viewpoints*     instance_;
-  float                  lastX_;
-  float                  lastY_;
-  bool                   firstMouse_ = true;
-  int32_t                viewIndex_  = 0;
+  std::vector<Viewpoint>      viewpoints_;
+  std::vector<CameraPosition> cameraPosition_;
+  Camera                      camera_;
+  static Viewpoints*          instance_;
+  float                       lastX_;
+  float                       lastY_;
+  bool                        firstMouse_     = true;
+  int32_t                     viewpointIndex_ = 0;
+  int32_t                     cameraIndex_    = 0;
 };

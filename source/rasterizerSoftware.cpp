@@ -36,145 +36,179 @@
 #include "pointcloud.hpp"
 #include "image.hpp"
 #include "viewpoints.hpp"
+#include <omp.h>
 
 RasterizerSoftware::RasterizerSoftware() {}
 
 RasterizerSoftware::~RasterizerSoftware() {}
 
-inline glm::mat2 invMat( glm::mat2& m ) {
-  float det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
-  return glm::mat2( m[1][1] / det, -m[0][1] / det, -m[1][0] / det, m[0][0] / det );
+#define BLOCK_SIZE 16
+
+template <typename T>
+T clamp( T v, T a, T b ) {
+  return ( ( v < a ) ? a : ( ( v > b ) ? b : v ) );
 }
 
-inline glm::mat3 quatToMat( glm::quat q ) {
-  return glm::mat3( 1 - 2 * ( q.y * q.y + q.z * q.z ), 2 * ( q.x * q.y + q.w * q.z ), 2 * ( q.x * q.z - q.w * q.y ),
-                    2 * ( q.x * q.y - q.w * q.z ), 1 - 2 * ( q.x * q.x + q.z * q.z ), 2 * ( q.y * q.z + q.w * q.x ),
-                    2 * ( q.x * q.z + q.w * q.y ), 2 * ( q.y * q.z - q.w * q.x ), 1 - 2 * ( q.x * q.x + q.y * q.y ) );
+glm::vec4 computeRadiance( const glm::vec4 sh[16], const glm::vec3 direction, float opacity ) {
+  const float C[14] = { 0.28209479177387814f, 0.4886025119029199f,  1.0925484305920792f, -1.0925484305920792f,
+                        0.31539156525252005f, -1.0925484305920792f, 0.5462742152960396f, -0.5900435899266435f,
+                        2.890611442640554f,   -0.4570457994644658f, 0.3731763325901154f, -0.4570457994644658f,
+                        1.445305721320277f,   -0.5900435899266435f };
+  glm::vec3   v     = glm::normalize( direction );
+  float       xx = v.x * v.x, yy = v.y * v.y, zz = v.z * v.z, xy = v.x * v.y, yz = v.y * v.z, xz = v.x * v.z;
+  glm::vec3   color = C[0] * sh[0].xyz;
+  color += C[1] * ( -v.y * sh[1].xyz + v.z * sh[2].xyz - v.x * sh[3].xyz );    //
+  color += C[2] * xy * sh[4].xyz                                               //
+           + C[3] * yz * sh[5].xyz                                             //
+           + C[4] * ( 2.0f * zz - xx - yy ) * sh[6].xyz                        //
+           + C[5] * xz * sh[7].xyz                                             //
+           + C[6] * ( xx - yy ) * sh[8].xyz;                                   //
+  color += C[7] * v.y * ( 3.0f * xx - yy ) * sh[9].xyz                         //
+           + C[8] * xy * v.z * sh[10].xyz                                      //
+           + C[9] * v.y * ( 4.0f * zz - xx - yy ) * sh[11].xyz                 //
+           + C[10] * v.z * ( 2.0f * zz - 3.0f * xx - 3.0f * yy ) * sh[12].xyz  //
+           + C[11] * v.x * ( 4.0f * zz - xx - yy ) * sh[13].xyz                //
+           + C[12] * v.z * ( xx - yy ) * sh[14].xyz                            //
+           + C[13] * v.x * ( xx - 3.0f * yy ) * sh[15].xyz;                    //
+  color += 0.5f;                                                               //
+  return glm::vec4( glm::clamp( color, glm::vec3( 0. ), glm::vec3( 1. ) ), opacity );
 }
 
-constexpr double radians( double degrees ) { return degrees * M_PI / 180.0; }
+glm::mat3 quatToRotation( glm::quat q ) {
+  float xx = q.x * q.x, xy = q.x * q.y, xz = q.x * q.z;
+  float yy = q.y * q.y, yz = q.y * q.z, zz = q.z * q.z;
+  float wx = q.w * q.x, wy = q.w * q.y, wz = q.w * q.z;
+  return glm::transpose( glm::mat3( 1. - 2. * ( yy + zz ), 2. * ( xy - wz ), 2. * ( xz + wy ), 2. * ( xy + wz ),
+                                    1. - 2. * ( xx + zz ), 2. * ( yz - wx ), 2. * ( xz - wy ), 2. * ( yz + wx ),
+                                    1. - 2. * ( xx + yy ) ) );
+}
+
+glm::mat3 computeCovariance3D( glm::quat quat, glm::vec4 scale ) {
+  glm::mat3 R = quatToRotation( quat );
+  glm::mat3 M = glm::mat3( R[0] * scale.x, R[1] * scale.y, R[2] * scale.z );
+  return M * glm::transpose( M );
+}
+
+glm::mat2 computeCovariance2D( glm::vec3 mean,
+                               glm::mat3 covar,
+                               glm::mat3 viewMat,
+                               glm::mat3 projMat,
+                               glm::vec2 window ) {
+  glm::mat3   covarC = viewMat * covar * transpose( viewMat );
+  glm::vec2   c      = 0.5f * window.xy;
+  glm::vec2   f      = glm::vec2( projMat[0][0], projMat[1][1] ) * c;
+  glm::vec2   tanFov = glm::vec2( c.x / projMat[0][0], c.y / f.y );
+  glm::vec2   minXY  = ( c / f ) * glm::vec2( 1.3 );
+  float       tx     = mean.z * clamp( mean.x / mean.z, -minXY.x, minXY.x );
+  float       ty     = mean.z * clamp( mean.y / mean.z, -minXY.y, minXY.y );
+  float       tz2    = mean.z * mean.z;
+  glm::mat2x3 J      = glm::mat2x3( f.x / mean.z, 0.0, -f.x * mean.x / tz2, 0.0, f.y / mean.z, -f.y * mean.y / tz2 );
+  return glm::mat2( dot( J[0], covarC * J[0] ), dot( J[0], covarC * J[1] ), dot( J[1], covarC * J[0] ),
+                    dot( J[1], covarC * J[1] ) );
+}
+
+glm::vec3 computeConic( glm::mat2 covar2d, float& radius ) {
+  covar2d[0][0] += 0.3;
+  covar2d[1][1] += 0.3;
+  float det = std::max( covar2d[0][0] * covar2d[1][1] - covar2d[0][1] * covar2d[1][0], 1e-10f );
+  float b   = ( covar2d[0][0] + covar2d[1][1] ) * 0.5;
+  float v1  = b + sqrt( std::max( b * b - det, 0.01f ) );
+  radius    = int( ceil( 3.0 * sqrt( v1 ) ) );
+  return glm::vec3( covar2d[1][1] / det, -( covar2d[0][1] + covar2d[1][0] ) / ( 2.0 * det ), covar2d[0][0] / det );
+}
 
 template <typename T, int N>
-void RasterizerSoftware::render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image ) {
-  int       width     = image.width();
-  int       height    = image.height();
-  int32_t   numPoints = pc.size();
-  int32_t   count     = 0;
-  Camera    camera( image.width(), image.height(), viewpoint.pos(), viewpoint.view(), viewpoint.up() );
+void RasterizerSoftware::render( const Pointcloud&  pc,
+                                 const Viewpoint&   viewpoint,
+                                 Image<T, N>&       image,
+                                 Image<uint8_t, 1>& ocm ) {
+  int     width          = image.width();
+  int     height         = image.height();
+  int32_t numPoints      = pc.size();
+  int32_t count          = 0;
+  auto    cameraPosition = pc.getCameraPosition();
+  float   focal          = cameraPosition.size() > 0 ? cameraPosition[0].focal_[0] : 2000.f;
+  float   fov            = 2 * atan( 1.0f / ( 2 * focal / image.height() ) );
+  Camera  camera;
+  camera.create( 10.f, fov );
+  camera.initialize( image.width(), image.height() );
+  camera.setLookAt( viewpoint.pos(), viewpoint.view(), viewpoint.up() );
+
   glm::mat4 viewMat = camera.viewMat();
-  auto      pos     = camera.center();
+  auto      pos     = camera.getPosition();
   auto      projMat = camera.projMat();
   auto      nearFar = camera.nearFar();
 
-  // Sort
-  std::vector<uint32_t> depth( numPoints );
-  std::vector<uint32_t> index( numPoints );
-  const uint32_t        maxValue      = std::numeric_limits<uint32_t>::max();
-  auto                  modelViewProj = projMat * viewMat;
-  for ( int32_t i = 0; i < numPoints; ++i ) {
-    glm::vec4 p = modelViewProj * glm::vec4( pc[i].xyz_, 1.f );
-    if ( p.w > nearFar.x && p.w < nearFar.y && std::abs( p.x / p.w ) < 1.2 && std::abs( p.y / p.w ) < 1.2 ) {
-      depth[count] = uint32_t( (float)maxValue * ( nearFar.y - p.w ) / ( nearFar.y - nearFar.x ) );
-      index[count] = i;
-      count++;
-      // if ( count > 100 ) break;
-    }
-  }
-  std::vector<uint32_t> indices( count );
-  std::iota( indices.begin(), indices.end(), 0 );
-  std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] < depth[b]; } );
-  std::vector<uint32_t> sorted( count );
-  std::transform( indices.begin(), indices.end(), sorted.begin(), [&]( uint32_t idx ) { return index[idx]; } );
-
   // Project sorted splat
-  Image<glm::vec4, 1> buffer( width, height, glm::vec4( 0 ) );
-  for ( const auto& i : sorted ) {
-    const auto& gs = pc[i];
-    // Vertex shader
-    glm::vec4 t = viewMat * glm::vec4( gs.xyz_, 1.0 );
-    glm::vec4 p = projMat * t;
-    glm::mat3 J = glm::mat3(
-        glm::vec3( -projMat[0][0] * width / ( 2.0 * t.z ), 0.0, projMat[0][0] * width * t.x / ( 2.0 * t.z * t.z ) ),
-        glm::vec3( 0.0, -projMat[1][1] * height / ( 2.0 * t.z ), projMat[1][1] * height * t.y / ( 2.0 * t.z * t.z ) ),
-        glm::vec3( 0.0, 0.0, ( nearFar.y - nearFar.x ) * projMat[3][2] / ( 2.0 * t.z * t.z ) ) );
-    glm::mat3 R      = quatToMat( glm::normalize( gs.rotate_ ) );
-    glm::mat3 S      = glm::mat3( glm::vec3( exp( gs.scale_.x ), 0.0, 0.0 ), glm::vec3( 0.0, exp( gs.scale_.y ), 0.0 ),
-                             glm::vec3( 0.0, 0.0, exp( gs.scale_.z ) ) );
-    glm::mat3 C      = R * S * glm::transpose( S ) * glm::transpose( R );
-    glm::mat3 JW     = J * glm::mat3( viewMat );
-    glm::mat3 V      = JW * C * glm::transpose( JW );
-    glm::mat2 cov    = glm::mat2( V[0][0], V[0][1], V[1][0], V[1][1] ) + glm::mat2( 0.6, 0.0, 0.0, 0.6 );
-    glm::mat2 covInv = invMat( cov );
-    glm::vec2 screen = glm::vec2( 0.5f * width * ( p.x / p.w + 1 ) - 0.5, 0.5f * height * ( p.y / p.w + 1 ) - 0.5 );
-    glm::vec4 color  = glm::clamp( glm::vec4( gs.computeRadiance( gs.xyz_ - pos ), gs.alpha() ) );
+  const glm::vec2     scale = glm::vec2( 2.0 / width, 2.0 / height );
+  Image<glm::vec4, 1> buffer( width, height, glm::vec4( 0, 0, 0, 1 ) );
+  Image<uint8_t, 1>   done( width, height, 0 );
+  ocm.fill( 0 );
 
-    // Geometry shader
-    glm::vec3 ndcP = glm::vec3( p.x, p.y, p.z ) / p.w;
-    if ( ndcP.z < 0.25f || ndcP.x > 2.0f || ndcP.x < -2.0f || ndcP.y > 2.0f || ndcP.y < -2.0f ) { continue; }
-    float avg   = ( cov[0][0] + cov[1][1] ) * 0.5;
-    float diff  = ( cov[0][0] - cov[1][1] ) * 0.5;
-    float diag  = sqrt( diff * diff + cov[0][1] * cov[0][1] );
-    float angle = ( cov[0].y == 0.0 ) ? ( cov[0][0] >= cov[1][1] ? 0.0 : radians( 90.0 ) )
-                                      : glm::atan( avg + diag - cov[0][0], cov[0][1] );
-    //    glm::vec2 a0    = 3.5f * sqrt( avg + diag ) * glm::vec2( cos( angle ), sin( angle ) );
-    glm::vec2 a0 = 3.5f * glm::vec2( sqrt( avg + diag ) ) * glm::vec2( cos( angle ), sin( angle ) );
-    glm::vec2 a1 = 3.5f * glm::vec2( sqrt( avg - diag ) ) * glm::vec2( -sin( angle ), cos( angle ) );
+  const glm::vec2 window( width, height ), halfWindow( width * 0.5f, height * 0.5f );
+  const glm::vec2 offsets[4] = { glm::vec2( 1, 1 ), glm::vec2( -1, 1 ), glm::vec2( 1, -1 ), glm::vec2( -1, -1 ) };
+
+  // Sort
+  auto modelViewProj = projMat * viewMat;
+  auto sorted        = pc.sort( modelViewProj, nearFar, true );
+
+  for ( const auto& i : sorted ) {
+    // Vertex shader
+    float       radius;
+    const auto& gs      = pc[i];
+    glm::vec4   t       = viewMat * gs.xyz_;
+    glm::vec4   p       = projMat * t;
+    glm::vec3   ndc     = glm::vec3( p.x / p.w, p.y / p.w, p.z / p.w );
+    glm::mat3   covar3d = computeCovariance3D( gs.rotate_, gs.scale_ );
+    glm::mat2   covar2d = computeCovariance2D( t.xyz, covar3d, glm::mat3( viewMat ), glm::mat3( projMat ), window );
+    glm::vec3   conic   = computeConic( covar2d, radius );
+    glm::vec4   color   = computeRadiance( gs.sh_, gs.xyz_.xyz - pos, gs.opacity_ );
+    glm::vec2   screen  = halfWindow * ndc.xy + halfWindow;
 
     // Frament shader
-    glm::vec2 P[4] = { screen + a0 + a1, screen - a0 + a1, screen + a0 - a1, screen - a0 - a1 };
-    int32_t   minU = std::max( (int)( std::floor( std::min( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), 0 );
-    int32_t   minV = std::max( (int)( std::floor( std::min( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), 0 );
-    int32_t   maxU = std::min( (int)( std::ceil( std::max( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), width - 1 );
-    int32_t   maxV = std::min( (int)( std::ceil( std::max( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), height - 1 );
+    glm::vec3 P[4];
+    float     z = ndc.z * 0.5f + 0.5f;
+    for ( size_t j = 0; j < 4; j++ ) P[j] = glm::vec3( screen + offsets[j].xy * radius, z );
+    int32_t minU = std::max( (int)( std::floor( std::min( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), 0 );
+    int32_t minV = std::max( (int)( std::floor( std::min( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), 0 );
+    int32_t maxU = std::min( (int)( std::ceil( std::max( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), width - 1 );
+    int32_t maxV = std::min( (int)( std::ceil( std::max( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), height - 1 );
+#pragma omp for
     for ( int32_t v = minV; v <= maxV; ++v ) {
       for ( int32_t u = minU; u <= maxU; ++u ) {
-        glm::vec2 d = screen - glm::vec2( u, v );
-        float     g = exp( -0.5f * glm::dot( d, covInv * d ) );
-        if ( g * color.a > 1.0f / 256.0f ) {
-          glm::vec4 out_color = glm::vec4( color.rgb() * color.a * g, color.a * g );
-          auto&     value     = buffer[0].get( u, v );
-          value               = glm::vec4( out_color.rgb() + value.rgb() * ( 1.0f - out_color.a ),
-                             out_color.a + value.a * ( 1.0f - out_color.a ) );
+        if ( done[0].get( u, v ) == 0 ) {
+          glm::vec2 d     = screen - glm::vec2( u + 0.5, v + 0.5 );
+          float     sigma = 0.5 * ( conic.x * d.x * d.x + conic.z * d.y * d.y ) + conic.y * d.x * d.y;
+          if ( sigma < 0.0f ) continue;
+          float alpha = std::min( color.a * exp( -sigma ), 0.999f );
+          if ( alpha >= ( 1.0f / 255.0f ) ) {
+            if ( alpha >= ( 10.0f / 255.0f ) ) ocm[0].get( u, v ) = 255;
+            auto& value  = buffer[0].get( u, v );
+            float t      = value.a;
+            float test_t = t * ( 1.0 - alpha );
+            if ( test_t < 0.0001f ) {
+              done[0].get( u, v ) = 1;
+            } else {
+              value.rgb += color.rgb * alpha * t;
+              value.a = test_t;
+            }
+          }
         }
       }
     }
   }
-
-  // Convert vec4 image to output image
-  const int32_t size = width * height;
-  if constexpr ( std::is_same_v<T, uint8_t> ) {
-    const float scale = 255.f;
-    for ( int i = 0; i < size; ++i ) {
-      auto& current     = buffer[0].get( i );
-      image[0].get( i ) = (T)roundf( current.r * scale );
-      image[1].get( i ) = (T)roundf( current.g * scale );
-      image[2].get( i ) = (T)roundf( current.b * scale );
-      if ( N == 4 ) image[3].get( i ) = ( T )( current.a * scale );
-    }
-  } else if constexpr ( std::is_same_v<T, uint16_t> ) {
-    const float scale = 65535.f;
-    for ( int i = 0; i < size; ++i ) {
-      auto& current     = buffer[0].get( i );
-      image[0].get( i ) = (T)roundf( current.r * scale );
-      image[1].get( i ) = (T)roundf( current.g * scale );
-      image[2].get( i ) = (T)roundf( current.b * scale );
-      if ( N == 4 ) image[3].get( i ) = ( T )( current.a * scale );
-    }
-  } else if constexpr ( std::is_same_v<T, float> ) {
-    for ( int i = 0; i < size; ++i ) {
-      auto& current     = buffer[0].get( i );
-      image[0].get( i ) = current.r;
-      image[1].get( i ) = current.g;
-      image[2].get( i ) = current.b;
-      if ( N == 4 ) image[3].get( i ) = ( T )( current.a );
-    }
-  } else {
-    printf( "Error: template type not support in %s\n", __FILE__ );
-    fflush( stdout );
-    exit( -1 );
-  }
+  image.from( buffer );
 }
 
-template void RasterizerSoftware::render<uint8_t>( Pointcloud const&, const Viewpoint&, Image<uint8_t>& );
-template void RasterizerSoftware::render<uint16_t>( Pointcloud const&, const Viewpoint&, Image<uint16_t>& );
-template void RasterizerSoftware::render<float>( Pointcloud const&, const Viewpoint&, Image<float>& );
+template void RasterizerSoftware::render<uint8_t>( Pointcloud const&,
+                                                   const Viewpoint&,
+                                                   Image<uint8_t>&,
+                                                   Image<uint8_t, 1>& );
+template void RasterizerSoftware::render<uint16_t>( Pointcloud const&,
+                                                    const Viewpoint&,
+                                                    Image<uint16_t>&,
+                                                    Image<uint8_t, 1>& );
+template void RasterizerSoftware::render<float>( Pointcloud const&,
+                                                 const Viewpoint&,
+                                                 Image<float>&,
+                                                 Image<uint8_t, 1>& );

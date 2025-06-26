@@ -47,5 +47,5 @@ class RasterizerSoftware {
   ~RasterizerSoftware();
 
   template <typename T, int N>
-  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image );
+  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image, Image<uint8_t, 1>& ocm );
 };

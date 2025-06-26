@@ -38,12 +38,12 @@
 
 class Camera {
  public:
-  Camera( int width = 0, int height = 0 ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), ratio_( 45.0f ) {
+  Camera( int width = 0, int height = 0, float fov = glm::radians( 45.f ) ) :
+      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ) {
     initialize( width, height );
   }
-  Camera( int width, int height, const glm::vec3 ePos, const glm::vec3 eCenter, const glm::vec3 eUp ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( 45.0f ) {
+  Camera( int width, int height, float fov, const glm::vec3 ePos, const glm::vec3 eCenter, const glm::vec3 eUp ) :
+      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ) {
     initialize( width, height );
     setLookAt( ePos, eCenter, eUp );
   }
@@ -67,7 +67,7 @@ class Camera {
   }
   auto nearFar() const { return nearFar_; }
 
-  glm::mat4 projMat() const { return glm::perspective( glm::radians( fov_ ), ratio_, nearFar_.x, nearFar_.y ); }
+  glm::mat4 projMat() const { return glm::perspective( fov_, ratio_, nearFar_.x, nearFar_.y ); }
 
   std::tuple<glm::vec3, glm::vec3, glm::vec3> getLookAt() {
     auto mat = glm::toMat3( rotation_ );
@@ -135,6 +135,6 @@ class Camera {
   float     dist_;
   float     boxSize_;
   float     ratio_;
-  float     fov_     = 45.0f;
-  glm::vec2 nearFar_ = { 0.001f, 1000.0f };
+  float     fov_     = glm::radians( 45.0f );
+  glm::vec2 nearFar_ = { 0.5f, 500.0f };
 };

@@ -37,55 +37,62 @@
 
 #include "common.hpp"
 
-struct GaussianData {
-  glm::vec3 xyz_;
-  float     opacity_;
-  glm::vec4 sh_[3][4];
-  glm::vec3 scale_;
+struct alignas( 16 ) GaussianData {
+  glm::vec4 xyz_;
+  glm::vec4 scale_;
   glm::quat rotate_;
-  glm::vec3 normal_;
+  glm::vec4 sh_[16];
+  float     opacity_;
+};
 
-  inline glm::mat3 cov() const {
-    glm::mat3 R( glm::normalize( rotate_ ) );
-    glm::mat3 S( glm::vec3( expf( scale_[0] ), 0.0f, 0.0f ),  //
-                 glm::vec3( 0.0f, expf( scale_[1] ), 0.0f ),  //
-                 glm::vec3( 0.0f, 0.0f, expf( scale_[2] ) ) );
-    return R * S * glm::transpose( S ) * glm::transpose( R );
+struct CameraPosition {
+  int32_t     index_;
+  int32_t     cameraId_;
+  glm::vec3   position_;
+  glm::quat   orientation_;
+  glm::vec2   focal_;
+  std::string name_;
+  void        log() const {
+    printf(
+        "index = %8d id = %8d xyz= %16.10f %16.10f %16.10f quat = %16.10f %16.10f %16.10f %16.10f focal = %16.10f "
+        "%16.10f %s "
+        "\n",
+        index_, cameraId_, position_.x, position_.y, position_.z, orientation_.x, orientation_.y, orientation_.z,
+        orientation_.w, focal_.x, focal_.y, name_.c_str() );
   }
 
-  inline glm::vec3 computeRadiance( const glm::vec3& direction ) const {
-    const float k[10]  = { 0.28209479177387814f, 0.4886025119029199f, 1.0925484305920792f, 0.31539156525252005f,
-                          0.5462742152960396f,  0.5900435899266435f, 2.8906114426405543f, 0.4570457994644658f,
-                          0.37317633259011546f, 1.4453057213202771f };
-    glm::vec3   v      = glm::normalize( direction );
-    glm::vec3   v2     = v * v;
-    glm::vec4   b0     = glm::vec4( k[0], -k[1] * v.y, k[1] * v.z, -k[1] * v.x );
-    glm::vec4   b1     = glm::vec4( k[2] * v.y * v.x, -k[2] * v.y * v.z, k[3] * ( 3 * v2.z - 1 ), -k[2] * v.x * v.z );
-    glm::vec4   b2     = glm::vec4( k[4] * ( v2.x - v2.y ), -k[5] * v.y * ( 3 * v2.x - v2.y ), k[6] * v.y * v.x * v.z,
-                              -k[7] * v.y * ( 5 * v2.z - 1 ) );
-    glm::vec4   b3     = glm::vec4( k[8] * v.z * ( 5 * v2.z - 3 ), -k[7] * v.x * ( 5 * v2.z - 1 ),
-                              k[9] * v.z * ( v2.x - v2.y ), -k[5] * v.x * ( v2.x - 3 * v2.y ) );
-    glm::vec3   result = glm::vec3( glm::dot( sh_[0][0], b0 ) + glm::dot( sh_[0][1], b1 ) + glm::dot( sh_[0][2], b2 ) +
-                                      glm::dot( sh_[0][3], b3 ) + 0.5,
-                                  glm::dot( sh_[1][0], b0 ) + glm::dot( sh_[1][1], b1 ) + glm::dot( sh_[1][2], b2 ) +
-                                      glm::dot( sh_[1][3], b3 ) + 0.5,
-                                  glm::dot( sh_[2][0], b0 ) + glm::dot( sh_[2][1], b1 ) + glm::dot( sh_[2][2], b2 ) +
-                                      glm::dot( sh_[2][3], b3 ) + 0.5 );
-    return result;
+  void updateView( glm::vec3& eEye, glm::vec3& eCenter, glm::vec3& eUp ) const {
+    glm::mat3 rotation = glm::transpose( glm::mat3_cast( orientation_ ) );
+    glm::vec3 forward  = rotation * glm::vec3( 0, 0, 1 );
+    glm::vec3 right    = rotation * glm::vec3( 1, 0, 0 );
+    glm::vec3 up       = rotation * glm::vec3( 0, -1, 0 );
+    eEye               = position_;
+    eCenter            = position_ + forward;
+    eUp                = up;
   }
 
-  inline double alpha() const { return 1.0 / ( 1.0 + exp( (double)( -opacity_ ) ) ); }
-
-  void traceSH() const {
-    for ( size_t j = 0; j < 3; j++ ) {
-      for ( size_t k = 0; k < 4; k++ ) {
-        printf( "SH[%zu][%zu] = %12.6f %12.6f %12.6f %12.6f ", j, k, sh_[j][k][0], sh_[j][k][1], sh_[j][k][2],
-                sh_[j][k][3] );
-      }
-      printf( "\n" );
-    }
+  glm::vec3 pos() const {
+    glm::vec3 eEye, eCenter, eUp;
+    updateView( eEye, eCenter, eUp );
+    return eEye;
+  }
+  glm::vec3 view() const {
+    glm::vec3 eEye, eCenter, eUp;
+    updateView( eEye, eCenter, eUp );
+    return eCenter;
+  }
+  glm::vec3 up() const {
+    glm::vec3 eEye, eCenter, eUp;
+    updateView( eEye, eCenter, eUp );
+    return eUp;
   }
 };
+
+static void traceSH( const GaussianData& gs ) {
+  for ( size_t j = 0; j < 16; j++ )
+    printf( "SH[%zu] = %12.6f %12.6f %12.6f %12.6f ", j, gs.sh_[j][0], gs.sh_[j][1], gs.sh_[j][2], gs.sh_[j][3] );
+  printf( "\n" );
+}
 
 class Pointcloud {
  public:
@@ -93,17 +100,19 @@ class Pointcloud {
   Pointcloud( const std::string& path, int32_t frameIndex ) { read( path, frameIndex ); }
   ~Pointcloud() { reset(); }
 
-  auto                begin() { return gaussianData_.begin(); }
-  auto                end() { return gaussianData_.end(); }
-  auto                begin() const { return gaussianData_.cbegin(); }
-  auto                end() const { return gaussianData_.cend(); }
-  GaussianData&       operator[]( int32_t index ) { return gaussianData_[index]; }
-  const GaussianData& operator[]( int32_t index ) const { return gaussianData_[index]; }
-  inline int32_t      size() const { return (int32_t)gaussianData_.size(); }
-  inline void*        data() const { return (void*)gaussianData_.data(); }
-  inline void         reset() { gaussianData_.clear(); }
+  auto                       begin() { return gaussianData_.begin(); }
+  auto                       end() { return gaussianData_.end(); }
+  auto                       begin() const { return gaussianData_.cbegin(); }
+  auto                       end() const { return gaussianData_.cend(); }
+  inline GaussianData&       operator[]( int32_t index ) { return gaussianData_[index]; }
+  inline const GaussianData& operator[]( int32_t index ) const { return gaussianData_[index]; }
+  inline int32_t             size() const { return (int32_t)gaussianData_.size(); }
+  inline void*               data() const { return (void*)gaussianData_.data(); }
+  inline void                reset() { gaussianData_.clear(); }
+  inline const auto&         getCameraPosition() const { return cameraPosition_; }
+  inline auto&               getCameraPosition() { return cameraPosition_; }
 
-  bool read( const std::string& path, int32_t frameIndex ) {
+  bool read( const std::string& path, int32_t frameIndex, bool verbose = false ) {
     auto filename = createFilename( path, frameIndex );
     if ( !exist( filename ) ) {
       printf( "Error: The input file does not exist: \"%s\"\n", filename.c_str() );
@@ -111,6 +120,12 @@ class Pointcloud {
     }
     std::string   line, s1, s2;
     std::ifstream inputPly;
+    printf( "Pointcloud reader: Reading %s \n", filename.c_str() );
+    fflush( stdout );
+    if ( verbose ) {
+      printf( "Pointcloud reader: Reading  %s \n", filename.c_str() );
+      fflush( stdout );
+    }
     inputPly.open( filename.c_str(), std::ios::in | std::ios::binary );
     if ( !inputPly.is_open() ) {
       printf( "Pointcloud reader: Couldn't open %s \n", filename.c_str() );
@@ -171,6 +186,20 @@ class Pointcloud {
         } else {
           bInHeaderElements = false;
           bInVertexElements = false;
+        }
+      } else if ( static_cast<int>( line.find( "comment" ) ) == 0 ) {
+        std::string key = "camera_position ";
+        if ( static_cast<int>( line.find( key ) ) > 0 ) {
+          line = line.substr( line.find( key ) + key.length() );
+          std::istringstream ss( line );
+          CameraPosition     el;
+          if ( ss >> el.index_ >> el.cameraId_ >> el.position_.x >> el.position_.y >> el.position_.z >>
+               el.orientation_.w >> el.orientation_.x >> el.orientation_.y >> el.orientation_.z >> el.focal_.x >>
+               el.focal_.y >> el.name_ ) {
+            cameraPosition_.push_back( el );
+          } else {
+            std::cerr << "Error: Can't read line.\n";
+          }
         }
       } else {
         if ( bInVertexElements && static_cast<int>( line.find( "property " ) ) == 0 ) {
@@ -249,35 +278,39 @@ class Pointcloud {
         dst.xyz_[0] = pCast[k + 0]( pC.data() + pIndex[k + 0] );  // x
         dst.xyz_[1] = pCast[k + 1]( pC.data() + pIndex[k + 1] );  // y
         dst.xyz_[2] = pCast[k + 2]( pC.data() + pIndex[k + 2] );  // z
+        dst.xyz_[3] = 1;
         k += 3;
 
-        dst.normal_[0] = pCast[k + 0]( pC.data() + pIndex[k + 0] );  // nx
-        dst.normal_[1] = pCast[k + 1]( pC.data() + pIndex[k + 1] );  // ny
-        dst.normal_[2] = pCast[k + 2]( pC.data() + pIndex[k + 2] );  // nz
+        // dst.normal_[0] = pCast[k + 0]( pC.data() + pIndex[k + 0] );  // nx
+        // dst.normal_[1] = pCast[k + 1]( pC.data() + pIndex[k + 1] );  // ny
+        // dst.normal_[2] = pCast[k + 2]( pC.data() + pIndex[k + 2] );  // nz
         k += 3;
         for ( int j = 0; j < 48; j++, k++ ) {
           float sh = pCast[k]( pC.data() + pIndex[k] );  // sh
           pSh[j]   = sh;
         }
 
-        dst.opacity_ = pCast[k]( pC.data() + pIndex[k] );  // o
+        dst.opacity_ = 1.0 / ( 1.0 + exp( -pCast[k]( pC.data() + pIndex[k] ) ) );  // o
         k++;
 
-        dst.scale_ = glm::vec3( pCast[k + 0]( pC.data() + pIndex[k + 0] ),    // scale 0
-                                pCast[k + 1]( pC.data() + pIndex[k + 1] ),    // scale 1
-                                pCast[k + 2]( pC.data() + pIndex[k + 2] ) );  // scale 2
+        dst.scale_ = glm::vec4( exp( pCast[k + 0]( pC.data() + pIndex[k + 0] ) ),       // scale 0
+                                exp( pCast[k + 1]( pC.data() + pIndex[k + 1] ) ),       // scale 1
+                                exp( pCast[k + 2]( pC.data() + pIndex[k + 2] ) ), 0 );  // scale 2
         k += 3;
-        dst.rotate_ = glm::quat( pCast[k + 0]( pC.data() + pIndex[k + 0] ),    // rx
-                                 pCast[k + 1]( pC.data() + pIndex[k + 1] ),    // ry
-                                 pCast[k + 2]( pC.data() + pIndex[k + 2] ),    // rz
-                                 pCast[k + 3]( pC.data() + pIndex[k + 3] ) );  // rw
-        dst.rotate_ = dst.rotate_;
+
+        float qw    = pCast[k + 0]( pC.data() + pIndex[k + 0] );
+        float qx    = pCast[k + 1]( pC.data() + pIndex[k + 1] );
+        float qy    = pCast[k + 2]( pC.data() + pIndex[k + 2] );
+        float qz    = pCast[k + 3]( pC.data() + pIndex[k + 3] );
+        dst.rotate_ = glm::normalize( glm::quat( qw, qx, qy, qz ) );
         k += 4;
-        for ( int j = 0, k = 3; j < 3; j++, k += 15 ) {
-          dst.sh_[j][0] = glm::vec4( pSh[j], pSh[k], pSh[k + 1], pSh[k + 2] );
-          dst.sh_[j][1] = glm::vec4( pSh[k + 3], pSh[k + 4], pSh[k + 5], pSh[k + 6] );
-          dst.sh_[j][2] = glm::vec4( pSh[k + 7], pSh[k + 8], pSh[k + 9], pSh[k + 10] );
-          dst.sh_[j][3] = glm::vec4( pSh[k + 11], pSh[k + 12], pSh[k + 13], pSh[k + 14] );
+        dst.sh_[0][0] = pSh[0];
+        dst.sh_[0][1] = pSh[1];
+        dst.sh_[0][2] = pSh[2];
+        for ( size_t sh_idx = 1; sh_idx < 15; ++sh_idx ) {
+          dst.sh_[sh_idx][0] = pSh[3 + sh_idx - 1];
+          dst.sh_[sh_idx][1] = pSh[3 + sh_idx + 14];
+          dst.sh_[sh_idx][2] = pSh[3 + sh_idx + 29];
         }
       }
       pC.clear();
@@ -316,24 +349,6 @@ class Pointcloud {
     for ( const auto& data : gaussianData_ ) {
       file.write( reinterpret_cast<const char*>( &data.xyz_ ), sizeof( data.xyz_ ) );
       file.write( reinterpret_cast<const char*>( normal.data() ), sizeof( normal ) );
-      for ( int j = 0, k = 3; j < 3; j++, k += 15 ) {
-        sh[j]      = data.sh_[j][0].x;
-        sh[k + 0]  = data.sh_[j][0].y;
-        sh[k + 1]  = data.sh_[j][0].z;
-        sh[k + 2]  = data.sh_[j][0].w;
-        sh[k + 3]  = data.sh_[j][1].x;
-        sh[k + 4]  = data.sh_[j][1].y;
-        sh[k + 5]  = data.sh_[j][1].z;
-        sh[k + 6]  = data.sh_[j][1].w;
-        sh[k + 7]  = data.sh_[j][2].x;
-        sh[k + 8]  = data.sh_[j][2].y;
-        sh[k + 9]  = data.sh_[j][2].z;
-        sh[k + 10] = data.sh_[j][2].w;
-        sh[k + 11] = data.sh_[j][3].x;
-        sh[k + 12] = data.sh_[j][3].y;
-        sh[k + 13] = data.sh_[j][3].z;
-        sh[k + 14] = data.sh_[j][3].w;
-      }
       file.write( reinterpret_cast<const char*>( sh.data() ), sizeof( sh ) );
       file.write( reinterpret_cast<const char*>( &data.opacity_ ), sizeof( data.opacity_ ) );
       file.write( reinterpret_cast<const char*>( &data.scale_ ), sizeof( data.scale_ ) );
@@ -346,121 +361,14 @@ class Pointcloud {
     return true;
   }
 
-  void removeSphericalHarmonics( int32_t number ) {
-    if ( number > 16 ) return;
-    for ( auto& el : gaussianData_ )
-      for ( size_t i = 0; i < 3; i++ )
-        for ( size_t j = 0; j < 4; j++ )
-          for ( size_t k = 0; k < 4; k++ )
-            if ( j * 4 + k >= number ) el.sh_[i][j][k] = 0;
-    numSH_ = number;
-  }
-
   std::pair<glm::vec3, glm::vec3> getBoundingBox() {
-    glm::vec3 minBound = gaussianData_[0].xyz_;
-    glm::vec3 maxBound = gaussianData_[0].xyz_;
+    glm::vec4 minBound = gaussianData_[0].xyz_;
+    glm::vec4 maxBound = gaussianData_[0].xyz_;
     for ( const auto& data : gaussianData_ ) {
       minBound = glm::min( minBound, data.xyz_ );
       maxBound = glm::max( maxBound, data.xyz_ );
     }
-    return { minBound, maxBound };
-  }
-
-  void quantizePosition( const int32_t bitdepth ) {
-    if ( bitdepth >= 32 ) return;
-    glm::dvec3 minBound = glm::dvec3( gaussianData_[0].xyz_ );
-    glm::dvec3 maxBound = glm::dvec3( gaussianData_[0].xyz_ );
-    for ( const auto& data : gaussianData_ ) {
-      minBound = glm::min( minBound, glm::dvec3( data.xyz_ ) );
-      maxBound = glm::max( maxBound, glm::dvec3( data.xyz_ ) );
-    }
-    const double     maxLevel = static_cast<double>( ( 1ULL << bitdepth ) - 1 );
-    const glm::dvec3 scale    = maxLevel / glm::dvec3( maxBound - minBound );
-    for ( auto& data : gaussianData_ ) {
-      glm::ivec3 quantized = glm::ivec3( glm::floor( ( glm::dvec3( data.xyz_ ) - minBound ) * scale + 0.5 ) );
-      data.xyz_            = glm::vec3( minBound + glm::dvec3( quantized ) / scale );
-    }
-    bitdepthPos_ = bitdepth;
-  }
-
-  void quantizeOpacity( const int32_t bitdepth ) {
-    if ( bitdepth >= 32 ) return;
-    double minBound = (double)gaussianData_[0].opacity_;
-    double maxBound = (double)gaussianData_[0].opacity_;
-    for ( const auto& data : gaussianData_ ) {
-      minBound = std::min( minBound, (double)data.opacity_ );
-      maxBound = std::max( maxBound, (double)data.opacity_ );
-    }
-    const double maxLevel = static_cast<double>( ( 1 << bitdepth ) - 1 );
-    const double scale    = maxLevel / (double)( maxBound - minBound );
-    for ( auto& data : gaussianData_ ) {
-      uint32_t quantized = uint32_t( floor( ( data.opacity_ - minBound ) * scale + 0.5 ) );
-      data.opacity_      = (float)( minBound + double( quantized ) / scale );
-    }
-    bitdepthOpacity_ = bitdepth;
-  }
-
-  void quantizeScale( const int32_t bitdepth ) {
-    if ( bitdepth >= 32 ) return;
-    glm::dvec3 minBound = glm::dvec3( gaussianData_[0].scale_ );
-    glm::dvec3 maxBound = glm::dvec3( gaussianData_[0].scale_ );
-    for ( const auto& data : gaussianData_ ) {
-      minBound = glm::min( minBound, glm::dvec3( data.scale_ ) );
-      maxBound = glm::max( maxBound, glm::dvec3( data.scale_ ) );
-    }
-    const double     maxLevel = static_cast<double>( ( 1 << bitdepth ) - 1 );
-    const glm::dvec3 scale    = maxLevel / glm::dvec3( maxBound - minBound );
-    for ( auto& data : gaussianData_ ) {
-      glm::ivec3 quantized = glm::ivec3( glm::floor( ( glm::dvec3( data.scale_ ) - minBound ) * scale + 0.5 ) );
-      data.scale_          = glm::vec3( minBound + glm::dvec3( quantized ) / scale );
-    }
-    bitdepthScale_ = bitdepth;
-  }
-
-  void quantizeRotate( const int32_t bitdepth ) {
-    if ( bitdepth >= 32 ) return;
-    if ( gaussianData_.empty() ) {
-      std::cerr << "Erreur : le vecteur gaussianData_ est vide." << std::endl;
-      return;
-    }
-    glm::dvec4 minBound = glm::dvec4( gaussianData_[0].rotate_.x, gaussianData_[0].rotate_.y,
-                                      gaussianData_[0].rotate_.z, gaussianData_[0].rotate_.w );
-    glm::dvec4 maxBound = minBound;
-    for ( const auto& data : gaussianData_ ) {
-      glm::dvec4 rotateVec = glm::dvec4( data.rotate_.x, data.rotate_.y, data.rotate_.z, data.rotate_.w );
-      minBound             = glm::min( minBound, rotateVec );
-      maxBound             = glm::max( maxBound, rotateVec );
-    }
-    const double     maxLevel = static_cast<double>( ( 1 << bitdepth ) - 1 );
-    const glm::dvec4 scale    = maxLevel / ( maxBound - minBound );
-    for ( auto& data : gaussianData_ ) {
-      glm::dvec4 rotateVec = glm::dvec4( data.rotate_.x, data.rotate_.y, data.rotate_.z, data.rotate_.w );
-      glm::ivec4 quantized = glm::ivec4( glm::floor( ( rotateVec - minBound ) * scale + 0.5 ) );
-      rotateVec            = minBound + glm::dvec4( quantized ) / scale;
-      data.rotate_         = glm::quat( rotateVec.w, rotateVec.x, rotateVec.y, rotateVec.z );
-    }
-    bitdepthRotate_ = bitdepth;
-  }
-
-  void quantizeSphericalHarmonics( const int32_t bitdepth ) {
-    if ( bitdepth >= 32 ) return;
-    for ( size_t i = 0; i < 3; i++ ) {
-      for ( size_t j = 0; j < 3; j++ ) {
-        glm::dvec4 minBound = gaussianData_[0].sh_[i][j];
-        glm::dvec4 maxBound = gaussianData_[0].sh_[i][j];
-        for ( const auto& data : gaussianData_ ) {
-          minBound = glm::min( minBound, glm::dvec4( data.sh_[i][j] ) );
-          maxBound = glm::max( maxBound, glm::dvec4( data.sh_[i][j] ) );
-        }
-        const double     maxLevel = static_cast<double>( ( 1 << bitdepth ) - 1 );
-        const glm::dvec4 scale    = maxLevel / ( maxBound - minBound );
-        for ( auto& data : gaussianData_ ) {
-          glm::ivec4 quantized = glm::ivec4( glm::floor( ( glm::dvec4( data.sh_[i][j] ) - minBound ) * scale + 0.5 ) );
-          data.sh_[i][j]       = glm::vec4( minBound + glm::dvec4( quantized ) / scale );
-        }
-      }
-    }
-    bitdepthSH_ = bitdepth;
+    return { minBound.xyz, maxBound.xyz };
   }
 
   void trace() {
@@ -473,9 +381,9 @@ class Pointcloud {
       printf( "o: %6.2f ", gs.opacity_ );
       printf( "s: %6.2f %6.2f %6.2f ", gs.scale_[0], gs.scale_[1], gs.scale_[2] );
       printf( "r: %6.2f %6.2f %6.2f %6.2f ", gs.rotate_[0], gs.rotate_[1], gs.rotate_[2], gs.rotate_[3] );
-      printf( "dc: %6.2f %6.2f %6.2f ", gs.sh_[0][0].x, gs.sh_[1][0].x, gs.sh_[2][0].x );
-      printf( "rest: %6.2f %6.2f %6.2f ", gs.sh_[0][0].y, gs.sh_[1][0].y, gs.sh_[2][0].y );
-      printf( " %6.2f %6.2f %6.2f ", gs.sh_[0][0].z, gs.sh_[1][0].z, gs.sh_[2][0].z );
+      printf( "dc: %6.2f %6.2f %6.2f ", gs.sh_[0].x, gs.sh_[0].x, gs.sh_[0].x );
+      printf( "rest: %6.2f %6.2f %6.2f ", gs.sh_[1].y, gs.sh_[1].y, gs.sh_[1].y );
+      printf( " %6.2f %6.2f %6.2f ", gs.sh_[2].z, gs.sh_[2].z, gs.sh_[2].z );
       printf( "\n" );
     }
     auto [minBound, maxBound] = getBoundingBox();
@@ -484,90 +392,65 @@ class Pointcloud {
     fflush( stdout );
   }
 
-  void diff( const Pointcloud& pc ) const {
-    bool diff = false;
-    if ( pc.size() != size() ) printf( "Diff: size are not the same \n" );
-    for ( size_t i = 0; i < gaussianData_.size(); i++ )
-      if ( gaussianData_[i].xyz_ != pc.gaussianData_[i].xyz_ ) {
-        printf( "Diff pos %zu / %zu : \n", i, gaussianData_.size() );
-        fflush( stdout );
-        diff = true;
+  std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar, bool inverse = false ) const {
+    int32_t               numPoints = size();
+    int32_t               count     = 0;
+    std::vector<uint32_t> depth( numPoints );
+    std::vector<uint32_t> index( numPoints );
+    const uint32_t        maxValue = std::numeric_limits<uint32_t>::max();
+    for ( int32_t i = 0; i < numPoints; ++i ) {
+      glm::vec4 p = modelViewProj * gaussianData_[i].xyz_;
+      if ( abs( p.x / p.w ) < 1.2 && abs( p.y / p.w ) < 1.2 && p.z > nearFar.x && p.z < nearFar.y ) {
+        depth[count] = uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) );
+        index[count] = i;
+        count++;
       }
-    // for ( size_t i = 0; i < gaussianData_.size(); i++ )
-    //   if ( gaussianData_[i].normal_ != pc.gaussianData_[i].normal_ ) {
-    //     printf( "Diff normal %zu / %zu : \n", i, gaussianData_.size() );
-    //     fflush( stdout );
-    //     diff = true;
-    //   }
-    for ( size_t i = 0; i < gaussianData_.size(); i++ )
-      if ( gaussianData_[i].opacity_ != pc.gaussianData_[i].opacity_ ) {
-        printf( "Diff opacity %zu / %zu : \n", i, gaussianData_.size() );
-        fflush( stdout );
-        diff = true;
-      }
-    for ( size_t i = 0; i < gaussianData_.size(); i++ )
-      if ( gaussianData_[i].scale_ != pc.gaussianData_[i].scale_ ) {
-        printf( "Diff scale %zu / %zu : \n", i, gaussianData_.size() );
-        fflush( stdout );
-        diff = true;
-      }
-    for ( size_t i = 0; i < gaussianData_.size(); i++ )
-      if ( gaussianData_[i].rotate_ != pc.gaussianData_[i].rotate_ ) {
-        printf( "Diff rotate %zu / %zu : \n", i, gaussianData_.size() );
-        fflush( stdout );
-        diff = true;
-      }
-
-    for ( size_t i = 0; i < gaussianData_.size(); i++ )
-      for ( size_t j = 0; j < 3; j++ )
-        for ( size_t k = 0; k < 4; k++ )
-          if ( gaussianData_[i].sh_[j][k] != pc.gaussianData_[i].sh_[j][k] ) {
-            printf( "Diff sh %zu / %zu : \n", i, gaussianData_.size() );
-            fflush( stdout );
-            gaussianData_[i].traceSH();
-            pc.gaussianData_[i].traceSH();
-            diff = true;
-            return;
-          }
-
-    if ( !diff ) {
-      printf( "Not difference \n" );
-      fflush( stdout );
     }
+    std::vector<uint32_t> indices( count );
+    std::iota( indices.begin(), indices.end(), 0 );
+    if ( inverse )
+      std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] < depth[b]; } );
+    else
+      std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] > depth[b]; } );
+    std::vector<uint32_t> sorted( count );
+    std::transform( indices.begin(), indices.end(), sorted.begin(), [&]( uint32_t idx ) { return index[idx]; } );
+    return sorted;
   }
 
-  int32_t bitdepthPos() { return bitdepthPos_; }
-  int32_t bitdepthOpacity() { return bitdepthOpacity_; }
-  int32_t bitdepthScale() { return bitdepthScale_; }
-  int32_t bitdepthRotate() { return bitdepthRotate_; }
-  int32_t bitdepthSH() { return bitdepthSH_; }
-  int32_t numSH() { return numSH_; }
+  // std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar ) const {
+  //   const uint32_t        maxValue = std::numeric_limits<uint32_t>::max();
+  //   int32_t               count    = 0;
+  //   std::vector<uint32_t> depth( gaussianData_.size() ), gaussianData_.index( size() );
+  //   for ( auto& gs : gaussianData_ ) {
+  //     glm::vec4 p = modelViewProj * gs.xyz_;
+  //     if ( abs( p.x / p.w ) < 1.2 && abs( p.y / p.w ) < 1.2 && p.z > nearFar.x && p.z < nearFar.y ) {
+  //       depth[count] = uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) );
+  //       index[count] = i;
+  //       count++;
+  //     }
+  //   }
+  //   std::vector<uint32_t> indices( count ), sorted( count );
+  //   std::iota( indices.begin(), indices.end(), 0 );
+  //   std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] > depth[b]; } );
+  //   std::transform( indices.begin(), indices.end(), sorted.begin(), [&]( uint32_t idx ) { return index[idx]; } );
+  //   return sorted;
+  // }
 
-  int32_t getNumBits() {
-    return 3 * bitdepthPos_ +      //
-           1 * bitdepthOpacity_ +  //
-           3 * bitdepthScale_ +    //
-           4 * bitdepthRotate_ +   //
-           numSH_ * 3 * bitdepthSH_;
-  }
-
-  std::string getParameters() {
-    return stringFormat( "pos=%d op=%2d scale=%2d rot=%2d sh=%2d numSh=%2d", bitdepthPos_, bitdepthOpacity_,
-                         bitdepthScale_, bitdepthRotate_, bitdepthSH_, numSH_ );
-  }
-
-  std::string getName() {
-    return stringFormat( "pos=%2d_op=%02d_scale=%02d_rot=%02d_sh=%02d_numSh=%02d", bitdepthPos_, bitdepthOpacity_,
-                         bitdepthScale_, bitdepthRotate_, bitdepthSH_, numSH_ );
-  }
+  // std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar ) const {
+  //   using Pair = std::pair<uint32_t, uint32_t>;
+  //   std::vector<Pair> valid;
+  //   for ( auto& gs : gaussianData_ ) {
+  //     glm::vec4 p = modelViewProj * gs.xyz_;
+  //     if ( abs( p.x / p.w ) < 1.2f && abs( p.y / p.w ) < 1.2f && p.z > nearFar.x && p.z < nearFar.y )
+  //       valid.emplace_back( i, uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) ) );
+  //   }
+  //   std::vector<uint32_t> sorted( valid.size() );
+  //   std::sort( valid.begin(), valid.end(), []( const Pair& a, const Pair& b ) { return a.second > b.second; } );
+  //   std::transform( valid.begin(), valid.end(), sorted.begin(), []( const auto& pair ) { return pair.first; } );
+  //   return sorted;
+  // }
 
  private:
-  std::vector<GaussianData> gaussianData_;
-
-  int32_t bitdepthPos_     = 32;
-  int32_t bitdepthOpacity_ = 32;
-  int32_t bitdepthScale_   = 32;
-  int32_t bitdepthRotate_  = 32;
-  int32_t bitdepthSH_      = 32;
-  int32_t numSH_           = 16;
+  std::vector<GaussianData>   gaussianData_;
+  std::vector<CameraPosition> cameraPosition_;
 };

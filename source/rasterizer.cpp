@@ -51,13 +51,22 @@ Rasterizer::~Rasterizer() {
 }
 
 template <typename T, int32_t N>
-void Rasterizer::render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image ) {
+void Rasterizer::render( const Pointcloud&  pc,
+                         const Viewpoint&   viewpoint,
+                         Image<T, N>&       image,
+                         Image<uint8_t, 1>& ocm ) {
   if ( useSoftware_ )
-    rasterizerSoftware_->render( pc, viewpoint, image );
+    rasterizerSoftware_->render( pc, viewpoint, image, ocm );
   else
-    rasterizerHardware_->render( pc, viewpoint, image );
+    rasterizerHardware_->render( pc, viewpoint, image, ocm );
 }
 
-template void Rasterizer::render<uint8_t>( Pointcloud const&, const Viewpoint&, Image<uint8_t, 3>& );
-template void Rasterizer::render<uint16_t>( Pointcloud const&, const Viewpoint&, Image<uint16_t, 3>& );
-template void Rasterizer::render<float>( Pointcloud const&, const Viewpoint&, Image<float, 3>& );
+template void Rasterizer::render<uint8_t>( Pointcloud const&,
+                                           const Viewpoint&,
+                                           Image<uint8_t, 3>&,
+                                           Image<uint8_t, 1>& );
+template void Rasterizer::render<uint16_t>( Pointcloud const&,
+                                            const Viewpoint&,
+                                            Image<uint16_t, 3>&,
+                                            Image<uint8_t, 1>& );
+template void Rasterizer::render<float>( Pointcloud const&, const Viewpoint&, Image<float, 3>&, Image<uint8_t, 1>& );

@@ -49,7 +49,7 @@ class RasterizerHardware {
   ~RasterizerHardware();
 
   template <typename T, int N>
-  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image );
+  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image, Image<uint8_t, 1>& ocm );
 
  private:
   bool initialize();
@@ -62,6 +62,7 @@ class RasterizerHardware {
   GLFWwindow* window_ = nullptr;
   GLuint      fbo_;
   GLuint      fboTexture_;
+  GLuint      ocm_;
   int32_t     width_  = -1;
   int32_t     height_ = -1;
   bool        loaded_ = false;

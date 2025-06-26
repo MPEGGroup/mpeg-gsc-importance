@@ -35,6 +35,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "text.hpp"
 
 enum class ImageFormat { PNG, BMP, TGA, JPG };
 
@@ -194,6 +195,8 @@ class Image {
   }
   T get( int32_t c, int32_t u, int32_t v ) const { return planes_[c].get( u, v ); }
 
+  void set( int32_t c, int32_t u, int32_t v, T e ) { planes_[c].set( u, v, e ); }
+
   Image& operator*=( T scalar ) {
     for ( auto& plane : planes_ ) plane *= scalar;
     return *this;
@@ -230,6 +233,22 @@ class Image {
     return true;
   }
 
+  void all_equal_zero() const {
+    bool zero = true;
+    for ( int32_t v = 0; v < height_; v++ )
+      for ( int32_t c = 0; c < N; c++ )
+        for ( int32_t u = 0; u < width_; u++ )
+          if constexpr ( std::is_same_v<T, glm::vec4> ) {
+            if ( static_cast<float>( planes_[c].get( u, v )[0] != 0 ) ) zero = false;
+            if ( static_cast<float>( planes_[c].get( u, v )[1] != 0 ) ) zero = false;
+            if ( static_cast<float>( planes_[c].get( u, v )[2] != 0 ) ) zero = false;
+            if ( static_cast<float>( planes_[c].get( u, v )[3] != 0 ) ) zero = false;
+          } else {
+            if ( planes_[c].get( u, v ) != 0 ) zero = false;
+          }
+    printf( "all_equal_zero => %s \n", zero ? "TRUE" : "FALSE" );
+  }
+
   void log( const std::string& str, int32_t u0 = 0, int32_t v0 = 0, int32_t number = 6 ) const {
     printf( "%s: %dx%d \n", str.c_str(), width_, height_ );
     for ( int32_t c = 0; c < N; c++ ) {
@@ -245,7 +264,6 @@ class Image {
       for ( int32_t c = 0; c < N; c++ ) {
         printf( "%4d: ", v );
         for ( int32_t u = u0; u < std::min( width_, u0 + number ); u++ )
-
           if constexpr ( std::is_same_v<T, glm::vec4> )
             printf( "(%6.2f,%6.2f,%6.2f,%6.2f) ", static_cast<float>( planes_[c].get( u, v )[0] ),
                     static_cast<float>( planes_[c].get( u, v )[1] ), static_cast<float>( planes_[c].get( u, v )[2] ),
@@ -260,7 +278,73 @@ class Image {
     fflush( stdout );
   }
 
+  void draw( char c, int32_t& x, int32_t& y ) {
+    const int32_t charIndex = static_cast<int>( c );
+    if ( charIndex < 0 || charIndex >= g_textCharacterNumber ) return;
+    for ( int j = 0, p = g_textIndex[charIndex]; j < g_textHeight[charIndex]; ++j ) {
+      for ( int i = 0; i < g_textWidth[charIndex]; ++i, p++ ) {
+        int posX = x + i + g_textLeft[charIndex];
+        int posY = height_ - 1 - ( y + 16 + j - g_textTop[charIndex] );
+        if ( posX >= 0 && posX < width_ && posY >= 0 && posY < height_ ) {
+          planes_[0].set( posX, posY, g_textCharacters[p] );
+          planes_[1].set( posX, posY, g_textCharacters[p] );
+          planes_[2].set( posX, posY, g_textCharacters[p] );
+        }
+      }
+    }
+    x += 11;
+  }
+
+  void draw( const std::string& text, int32_t x, int32_t y, bool left ) {
+    if ( left ) { x -= text.size() * 11; }
+    for ( char c : text ) draw( c, x, y );
+  }
   T clamp( T v, T a, T b ) const { return ( ( v < a ) ? a : ( ( v > b ) ? b : v ) ); }
+
+  void from( const Image<glm::vec4, 1>& buffer ) {
+    if ( buffer.width() != width_ || buffer.height() != height_ ) {
+      fprintf( stderr, "Error: Image dimensions mismatch (%dx%d vs %dx%d)\n", width_, height_, buffer.width(),
+               buffer.height() );
+      std::fflush( stderr );
+      std::exit( -1 );
+    }
+    const int32_t size = width_ * height_;
+    if constexpr ( std::is_same_v<T, uint8_t> ) {
+      const float scale = 255.f;
+      for ( int i = 0; i < size; ++i ) {
+        const glm::vec4& c  = buffer.plane( 0 ).get( i );
+        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.r * scale ), 0.f, 255.f ) );
+        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.g * scale ), 0.f, 255.f ) );
+        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.b * scale ), 0.f, 255.f ) );
+        if constexpr ( N == 4 ) {
+          planes_[3].get( i ) = static_cast<T>( std::round( std::clamp( c.a * scale + 0.5f, 0.f, 255.f ) ) );
+        }
+      }
+    } else if constexpr ( std::is_same_v<T, uint16_t> ) {
+      const float scale = 65535.f;
+      for ( int i = 0; i < size; ++i ) {
+        const glm::vec4& c  = buffer.plane( 0 ).get( i );
+        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.r * scale ), 0.f, 65535.f ) );
+        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.g * scale ), 0.f, 65535.f ) );
+        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.b * scale ), 0.f, 65535.f ) );
+        if constexpr ( N == 4 ) {
+          planes_[3].get( i ) = static_cast<T>( std::clamp( std::round( c.a * scale ), 0.f, 65535.f ) );
+        }
+      }
+    } else if constexpr ( std::is_same_v<T, float> ) {
+      for ( int i = 0; i < size; ++i ) {
+        const glm::vec4& c  = buffer.plane( 0 ).get( i );
+        planes_[0].get( i ) = c.r;
+        planes_[1].get( i ) = c.g;
+        planes_[2].get( i ) = c.b;
+        if constexpr ( N == 4 ) { planes_[3].get( i ) = c.a; }
+      }
+    } else {
+      fprintf( stderr, "Error: unsupported template type in %s\n", __FILE__ );
+      std::fflush( stderr );
+      std::exit( -1 );
+    }
+  }
 
  private:
   int32_t               width_;
@@ -301,15 +385,27 @@ class Video {
     for ( size_t i = 0; i < images_.size(); i++ ) images_[i].resize( width, height, value );
   };
 
-  void add( const Image<T, N>& image ) {
+  template <typename D, int M>
+  void add( const Image<D, M>& image ) {
     if ( size() > 0 && ( width_ != image.width() || height_ != image.height() ) ) {
       printf( "Error: image size are not the same \n" );
       fflush( stdout );
       exit( 0 );
     }
+    if ( image.planeCount() != N || N != M ) {
+      printf( "Error: image plane count is not the same \n" );
+      fflush( stdout );
+      exit( 0 );
+    }
     width_  = image.width();
     height_ = image.height();
-    images_.push_back( image );
+    if constexpr ( std::is_same_v<T, D> && N == M ) {
+      images_.push_back( image );
+    } else {
+      Image<T, N> convert;
+      convert = image;
+      images_.push_back( convert );
+    }
   }
 
   inline void zero() {
@@ -322,32 +418,33 @@ class Video {
     for ( auto& el : images_ ) { el.clear(); }
   }
 
-  Video& operator=( const Video& ) = default;
-  template <typename D, int M>
-  Video& operator=( const Video<D, M>& src ) {
-    resize( src.size(), src.width(), src.height() );
-    for ( int32_t i = 0; i < src.size(); i++ ) { images_[i] = src[i]; }
-    return *this;
-  }
-
   void swap( Video<T, N>& src ) {
     std::swap( width_, src.width_ );
     std::swap( height_, src.height_ );
     std::swap( images_, src.images_ );
   }
 
-  Image<T>&       plane( int32_t index ) { return images_[index]; }
-  const Image<T>& plane( int32_t index ) const { return images_[index]; }
-  Image<T>&       back() { return images_.back(); }
-  auto            begin() { return images_.begin(); }
-  auto            end() { return images_.end(); }
-  auto            begin() const { return images_.cbegin(); }
-  auto            end() const { return images_.cend(); }
-  Image<T>&       operator[]( int32_t index ) { return images_[index]; }
-  const Image<T>& operator[]( int32_t index ) const { return images_[index]; }
-  int32_t         size() const { return int32_t( images_.size() ); }
-  int32_t         width() const { return width_; }
-  int32_t         height() const { return height_; }
+  Image<T, N>&       plane( int32_t index ) { return images_[index]; }
+  const Image<T, N>& plane( int32_t index ) const { return images_[index]; }
+  Image<T, N>&       back() { return images_.back(); }
+  auto               begin() { return images_.begin(); }
+  auto               end() { return images_.end(); }
+  auto               begin() const { return images_.cbegin(); }
+  auto               end() const { return images_.cend(); }
+  Image<T, N>&       operator[]( int32_t index ) { return images_[index]; }
+  const Image<T, N>& operator[]( int32_t index ) const { return images_[index]; }
+  int32_t            size() const { return int32_t( images_.size() ); }
+  int32_t            width() const { return width_; }
+  int32_t            height() const { return height_; }
+
+  Video& operator=( const Video& ) = default;
+
+  template <typename D, int M>
+  Video& operator=( const Video<D, M>& src ) {
+    resize( src.size(), src.width(), src.height() );
+    for ( int32_t i = 0; i < src.size(); i++ ) { images_[i] = src[i]; }
+    return *this;
+  }
 
   Video& operator+=( Image<T, N>& image ) {
     this->add( image );
@@ -366,7 +463,7 @@ class Video {
 
   bool save( const std::string& prefix, const bool planar = false ) const {
     auto filename = prefix + "_" + std::to_string( width_ ) + "x" + std::to_string( height_ ) + "_" +
-                    std::to_string( sizeof( T ) * 8 ) + "b_" + ( planar ? "p" : "i" ) + "444.rgb";
+                    std::to_string( sizeof( T ) * 8 ) + "b_" + ( planar ? "p" : "i" ) + "444" + ".rgb ";
     std::ofstream file( filename, std::ios::binary );
     if ( !file.is_open() ) {
       printf( "Error: Unable to open file %s for writing.\n", filename.c_str() );
@@ -378,13 +475,23 @@ class Video {
           for ( int32_t v = height_ - 1; v >= 0; v-- )
             file.write( reinterpret_cast<const char*>( plane.data( 0, v ) ), width_ * sizeof( T ) );
     } else {
-      for ( const auto& image : images_ )
-        for ( int32_t v = height_ - 1; v >= 0; v-- )
-          for ( int32_t u = 0; u < width_; u++ )
-            for ( int32_t c = 0; c < 3; c++ ) {
-              T value = image.get( c, u, v );
+      for ( const auto& image : images_ ) {
+        for ( int32_t v = height_ - 1; v >= 0; v-- ) {
+          for ( int32_t u = 0; u < width_; u++ ) {
+            if ( N == 3 ) {
+              for ( int32_t c = 0; c < N; c++ ) {
+                T value = image.get( c, u, v );
+                file.write( reinterpret_cast<const char*>( &value ), sizeof( T ) );
+              }
+            } else {
+              T value = image.get( 0, u, v ), zero = 0;
               file.write( reinterpret_cast<const char*>( &value ), sizeof( T ) );
+              file.write( reinterpret_cast<const char*>( &zero ), sizeof( T ) );
+              file.write( reinterpret_cast<const char*>( &zero ), sizeof( T ) );
             }
+          }
+        }
+      }
     }
     if ( !file ) {
       printf( "Error: Failed to write image data to file : %s.\n", filename.c_str() );
@@ -428,6 +535,9 @@ class Video {
     fflush( stdout );
   }
 
+  void draw( const std::string& text, int32_t x, int32_t y, bool left = false ) {
+    for ( auto& image : images_ ) image.draw( text, x, y, left );
+  }
   T clamp( T v, T a, T b ) const { return ( ( v < a ) ? a : ( ( v > b ) ? b : v ) ); }
 
  private:
@@ -435,3 +545,20 @@ class Video {
   int32_t                  height_;
   std::vector<Image<T, N>> images_;
 };
+
+template <typename T, int N>
+Video<T, N> operator-( const Video<T, N>& a, const Video<T, N>& b ) {
+  assert( a.size() == b.size() );
+  assert( a.width() == b.width() );
+  assert( a.height() == b.height() );
+  Video<T, N> result;
+  result.resize( a.size(), a.width(), a.height() );
+  for ( int32_t i = 0; i < a.size(); ++i )
+    for ( int32_t v = 0; v < a.height(); ++v )
+      for ( int32_t u = 0; u < a.width(); ++u )
+        for ( int32_t c = 0; c < N; ++c ) {
+          int diff = int( a[i].get( c, u, v ) ) - int( b[i].get( c, u, v ) );
+          result[i].set( c, u, v, static_cast<T>( std::clamp( diff * 10 + 128, 0, 255 ) ) );
+        }
+  return result;
+}

@@ -35,7 +35,42 @@
 #pragma once
 
 #include "common.hpp"
-#include "shader.hpp"
+
+#include <glad/glad.h>
+
+class Shader {
+ public:
+  Shader( const std::string& eCode, GLenum eShaderType ) : object_( 0 ) {
+    GLint iStatus, iLength = 0;
+    code_             = eCode;
+    const char* pCode = eCode.c_str();
+    object_           = glCreateShader( eShaderType );
+    if ( object_ == 0 ) { throw std::runtime_error( "glCreateShader failed" ); }
+    glShaderSource( object_, 1, static_cast<const GLchar**>( &pCode ), nullptr );
+    glCompileShader( object_ );
+    glGetShaderiv( object_, GL_COMPILE_STATUS, &iStatus );
+    if ( iStatus == GL_FALSE ) {
+      glGetShaderiv( object_, GL_INFO_LOG_LENGTH, &iLength );
+      std::vector<char> pString;
+      pString.resize( iLength + 1 );
+      glGetShaderInfoLog( object_, iLength, nullptr, pString.data() );
+      glDeleteShader( object_ );
+      object_              = 0;
+      std::string eMessage = "Compile failure in shader: \n" + formatCode( eCode ) + "\n" + pString.data();
+      printf( "%s \n", eMessage.c_str() );
+      fflush( stdout );
+      throw std::runtime_error( eMessage );
+    }
+  }
+
+  ~Shader() = default;
+  GLuint             getObject() const { return object_; }
+  const std::string& getCode() const { return code_; }
+
+ private:
+  GLuint      object_;
+  std::string code_;
+};
 
 #include <glad/glad.h>
 /*! \class %Program
