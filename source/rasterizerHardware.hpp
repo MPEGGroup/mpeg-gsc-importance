@@ -42,6 +42,7 @@ class Pointcloud;
 template <typename T, int N>
 class Image;
 class Viewpoint;
+class GLFWwindow;
 
 class RasterizerHardware {
  public:

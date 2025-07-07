@@ -87,9 +87,54 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#if defined( USE_GLFW )
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+
+static void getBuffer( GLuint uiBuffer, std::vector<uint32_t>& vec, size_t size ) {
+  GLenum error = glGetError();
+  if ( error != GL_NO_ERROR ) {
+    printf( "OpenGL error code: 0x%x before getBuffer\n", error );
+    fflush( stdout );
+  }
+  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
+  void* rawKey = glMapBufferRange( GL_ELEMENT_ARRAY_BUFFER, 0, sizeof( uint32_t ) * size, GL_MAP_READ_BIT );
+  if ( !rawKey ) {
+    printf( "Error: glMapBufferRange failed, OpenGL error: 0x%x\n", glGetError() );
+    fflush( stdout );
+  } else {
+    if ( vec.size() < size ) { vec.resize( size ); }
+    memcpy( vec.data(), rawKey, sizeof( uint32_t ) * size );
+  }
+  if ( !glUnmapBuffer( GL_ELEMENT_ARRAY_BUFFER ) ) {
+    printf( "Error: glUnmapBuffer failed, OpenGL error: 0x%x\n", glGetError() );
+    fflush( stdout );
+  }
+  error = glGetError();
+  if ( error != GL_NO_ERROR ) {
+    printf( "OpenGL error code: 0x%x after getBuffer\n", error );
+    fflush( stdout );
+  }
+}
+
+static void setBuffer( GLuint uiBuffer, const std::vector<uint32_t>& vec ) {
+  GLenum error;
+  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
+  error = glGetError();
+  if ( error != GL_NO_ERROR ) {
+    printf( "OpenGL error: Failed to bind buffer 0x%x\n", error );
+    return;
+  }
+  glBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, vec.size() * sizeof( uint32_t ), vec.data() );
+  error = glGetError();
+  if ( error != GL_NO_ERROR ) {
+    printf( "OpenGL error: glBufferSubData failed with code 0x%x\n", error );
+    return;
+  }
+  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+}
+#endif
 
 #ifdef WIN32
 #define snprintf _snprintf
@@ -186,49 +231,6 @@ static void logVec3( const std::string& name, const glm::vec3& vec ) {
 
 static void logVec2( const std::string& name, const glm::vec2& vec ) {
   printf( "glm::vec2 %-8s( %12.8f, %12.8f ); \n", name.c_str(), vec[0], vec[1] );
-}
-
-static void getBuffer( GLuint uiBuffer, std::vector<uint32_t>& vec, size_t size ) {
-  GLenum error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error code: 0x%x before getBuffer\n", error );
-    fflush( stdout );
-  }
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
-  void* rawKey = glMapBufferRange( GL_ELEMENT_ARRAY_BUFFER, 0, sizeof( uint32_t ) * size, GL_MAP_READ_BIT );
-  if ( !rawKey ) {
-    printf( "Error: glMapBufferRange failed, OpenGL error: 0x%x\n", glGetError() );
-    fflush( stdout );
-  } else {
-    if ( vec.size() < size ) { vec.resize( size ); }
-    memcpy( vec.data(), rawKey, sizeof( uint32_t ) * size );
-  }
-  if ( !glUnmapBuffer( GL_ELEMENT_ARRAY_BUFFER ) ) {
-    printf( "Error: glUnmapBuffer failed, OpenGL error: 0x%x\n", glGetError() );
-    fflush( stdout );
-  }
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error code: 0x%x after getBuffer\n", error );
-    fflush( stdout );
-  }
-}
-
-static void setBuffer( GLuint uiBuffer, const std::vector<uint32_t>& vec ) {
-  GLenum error;
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error: Failed to bind buffer 0x%x\n", error );
-    return;
-  }
-  glBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, vec.size() * sizeof( uint32_t ), vec.data() );
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error: glBufferSubData failed with code 0x%x\n", error );
-    return;
-  }
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 }
 
 typedef float ( *CastFunction )( uint8_t* pPointer );

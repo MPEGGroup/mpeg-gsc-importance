@@ -36,9 +36,9 @@
 
 #include "common.hpp"
 #include "camera.hpp"
+#include "pointcloud.hpp"
 
-class Pointcloud;
-class CameraPosition;
+class GLFWwindow;
 
 class Viewpoint {
  public:

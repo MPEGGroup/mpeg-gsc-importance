@@ -25,7 +25,9 @@ print_usage()
   echo "       --format      : Format source code"
   echo "       --tidy        : Check source code with clang-tidy"
   echo "       --cppcheck    : Check source code with cppcheck"
-  echo "       -c|--compiler   : Compiler: {msvc, clang, gcc}" 
+  echo "       --noomp       : build without openMP"
+  echo "       --cup_only    : build cpu only version"
+  echo "       -c|--compiler : Compiler: {msvc, clang, gcc}" 
   echo "";
   echo "    Examples:";
   echo "      $0 "; 
@@ -34,7 +36,7 @@ print_usage()
   echo "      $0 --format";    
   echo "    ";  
   if [ $# != 0 ] ; then echo -e "ERROR: $1 \n"; fi
-  exit 0;
+  exit 1;
 }
 
 MODE=Release
@@ -54,6 +56,8 @@ while [[ $# -gt 0 ]] ; do
     --format       ) TARGETS+=( "clang-format" );;
     --tidy         ) TARGETS+=( "clang-tidy" );;
     --cppcheck     ) TARGETS+=( "cppcheck" );;       
+    --noomp        ) CMAKE_FLAGS+=( "-DUSE_OPENMP=OFF" );;
+    --cpu_only     ) CMAKE_FLAGS+=( "-DUSE_CPU_ONLY=ON" );;
     -c|--compiler=*) COMPILER=${V};;
     *              ) print_usage "unsupported arguments: $C ";;
   esac

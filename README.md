@@ -252,11 +252,11 @@ DIR=/g/gs/mpeg/bartender_stable_m71763/content.mpeg.expert/track_pos; \
 ### Run metrics
 
 ```bash
-DIR=/g/gs/mpeg/bartender_stable_m71763/content.mpeg.expert/track_pos; \
+DIR=/g/gs/mpeg_20250707/m71763_bartender_stable/track_pos; \
 ./build/Release/bin/Release/mpeg-gsc-metrics.exe \
-  -a ${DIR}/track_%04d.ply \
-  -b ${DIR}/track_%04d.ply \
-  -f 32 \
+  -a ${DIR}/frame%03d_pos.ply \
+  -b ${DIR}/frame%03d_pos.ply \
+  -f 1 \
   -i 0 \
   -s 1 \
   --useCameraPosition=1 \

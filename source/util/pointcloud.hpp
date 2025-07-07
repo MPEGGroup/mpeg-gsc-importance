@@ -368,7 +368,7 @@ class Pointcloud {
       minBound = glm::min( minBound, data.xyz_ );
       maxBound = glm::max( maxBound, data.xyz_ );
     }
-    return { minBound.xyz, maxBound.xyz };
+    return { minBound.xyz(), maxBound.xyz() };
   }
 
   void trace() {

@@ -75,7 +75,14 @@
     "bitset": "cpp",
     "complex": "cpp",
     "execution": "cpp",
-    "string_view": "cpp"
+    "string_view": "cpp",
+    "cerrno": "cpp",
+    "variant": "cpp",
+    "cassert": "cpp",
+    "mutex": "cpp",
+    "stop_token": "cpp",
+    "thread": "cpp",
+    "xstddef": "cpp"
   },
   "C_Cpp.errorSquiggles": "disabled",
   "cmake.buildType": "Release",

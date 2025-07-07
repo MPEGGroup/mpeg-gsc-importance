@@ -17,6 +17,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type: Debug, Release, RelWithDebInfo, MinSizeRel" FORCE)
 endif()
 
+option( USE_CPU_ONLY "CPU only, disbale GPU rendering and display mode"   OFF ) 
+OPTION( USE_OPENMP   "Use OpenMP library if available"                    ON )
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -30,13 +33,36 @@ if (MSVC)
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  /NODEFAULTLIB:LIBCMT")
 endif()
 
+## Open Multi-Processing (OpenMP)
+message("USE_CPU_ONLY = ${USE_CPU_ONLY}")
+message("USE_OPENMP   = ${USE_OPENMP}")
+if( USE_OPENMP )
+  FIND_PACKAGE( OpenMP )
+  IF( OPENMP_FOUND )
+    SET( CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}"   )
+    SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}" )
+  ELSE()
+    MESSAGE( FATAL_ERROR "Package OpenMP required, but not found!, please install apt install libomp-dev libomp5 or brew install libomp-dev libomp5" )  
+  ENDIF()
+ENDIF()
+
 # Cmake dependencies
 include( dependencies/cmake/CPM.cmake )
 include( dependencies/cmake/tools.cmake )
 include( dependencies/cmake/clang-format.cmake )
 include( dependencies/cmake/cppcheck.cmake )
-include( dependencies/cmake/glfw.cmake )
 include( dependencies/cmake/glm.cmake )
+if ( NOT USE_CPU_ONLY )
+  include( dependencies/cmake/glfw.cmake )
+endif()
+
+## INCLUDE 
+INCLUDE_DIRECTORIES( ${CMAKE_SOURCE_DIR}/external/stb )
+IF ( APPLE )
+  IF( USE_OPENMP )
+    LINK_LIBRARIES( ${OpenMP_CXX_LIBRARIES} )
+  ENDIF()
+ENDIF()
 
 # Build
 add_subdirectory(source)

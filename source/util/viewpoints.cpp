@@ -113,6 +113,7 @@ class Arrow {
   glm::vec4 color_;
 };
 
+#if defined( USE_GLFW )
 void Viewpoints::mouseCallback( GLFWwindow* window, double xpos, double ypos ) {
   if ( instance_ ) {
     int width = 0, height = 0;
@@ -311,5 +312,8 @@ void Viewpoints::display( const Pointcloud& pc, int width, int height ) {
   glfwDestroyWindow( window );
   glfwTerminate();
 }
+#else
+void Viewpoints::display( const Pointcloud& pc, int width, int height ) {}
+#endif
 
 Viewpoints* Viewpoints::instance_ = nullptr;

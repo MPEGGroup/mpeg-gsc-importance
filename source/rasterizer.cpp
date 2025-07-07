@@ -35,19 +35,28 @@
 
 #include "rasterizer.hpp"
 #include "rasterizerSoftware.hpp"
+#if defined( USE_GLFW )
 #include "rasterizerHardware.hpp"
+#endif
 
 Rasterizer::Rasterizer( bool useSoftware ) {
   useSoftware_ = useSoftware;
+
+#if defined( USE_GLFW )
   if ( useSoftware_ ) {
     rasterizerSoftware_ = std::make_unique<RasterizerSoftware>();
   } else {
     rasterizerHardware_ = std::make_unique<RasterizerHardware>();
   }
+#else
+  rasterizerSoftware_ = std::make_unique<RasterizerSoftware>();
+#endif
 }
 Rasterizer::~Rasterizer() {
   rasterizerSoftware_.reset();
+#if defined( USE_GLFW )
   rasterizerHardware_.reset();
+#endif
 }
 
 template <typename T, int32_t N>
@@ -55,10 +64,14 @@ void Rasterizer::render( const Pointcloud&  pc,
                          const Viewpoint&   viewpoint,
                          Image<T, N>&       image,
                          Image<uint8_t, 1>& ocm ) {
+#if defined( USE_GLFW )
   if ( useSoftware_ )
     rasterizerSoftware_->render( pc, viewpoint, image, ocm );
   else
     rasterizerHardware_->render( pc, viewpoint, image, ocm );
+#else
+  rasterizerSoftware_->render( pc, viewpoint, image, ocm );
+#endif
 }
 
 template void Rasterizer::render<uint8_t>( Pointcloud const&,

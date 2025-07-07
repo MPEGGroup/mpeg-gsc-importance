@@ -45,10 +45,8 @@ RasterizerHardware::~RasterizerHardware() {
   reset();
 }
 
-static void error_callback( int error, const char* description ) {
-  std::cerr << "Error: " << description << std::endl;
-  ;
-}
+#if defined( USE_GLFW )
+static void error_callback( int error, const char* description ) { std::cerr << "Error: " << description << std::endl; }
 
 bool RasterizerHardware::initialize() {
   reset();
@@ -237,6 +235,17 @@ void RasterizerHardware::render( const Pointcloud&  pc,
   glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
   glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 }
+#else
+bool RasterizerHardware::initialize() { return true; }
+void RasterizerHardware::reset() {}
+void RasterizerHardware::load( const Pointcloud& pc ) {}
+void RasterizerHardware::unload() {}
+template <typename T, int N>
+void RasterizerHardware::render( const Pointcloud&  pc,
+                                 const Viewpoint&   viewpoint,
+                                 Image<T, N>&       image,
+                                 Image<uint8_t, 1>& ocm ) {}
+#endif
 
 template void RasterizerHardware::render<uint8_t>( Pointcloud const&,
                                                    const Viewpoint&,

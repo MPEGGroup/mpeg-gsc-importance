@@ -18,7 +18,21 @@ file(GLOB CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
                     ${CMAKE_CURRENT_SOURCE_DIR}/util/*.cpp 
                     ${CMAKE_SOURCE_DIR}/dependencies/program-options-lite/*.cpp 
                     ${CMAKE_SOURCE_DIR}/dependencies/glad/src/glad.c)
-                    
+
+ SET( LIBS "")
+if ( NOT USE_CPU_ONLY ) 
+  list(APPEND LIBS ${GLFW_LIBRARIES})
+# else()
+#    foreach(f ${CPP_FILES})
+#         if(f MATCHES ".*rasterizerHardware.*" OR f MATCHES ".*viewpoints.*")
+#             list(REMOVE_ITEM CPP_FILES ${f})
+#         endif()
+#     endforeach()
+endif()
+
+IF(USE_OPENMP)
+  list(APPEND LIBS OpenMP::OpenMP_CXX)
+ENDIF()
 create_executable( NAME       mpeg-gsc-metrics 
                    SOURCES    ${CPP_FILES} 
                    INCLUDES   ${CMAKE_SOURCE_DIR}/source
@@ -28,5 +42,4 @@ create_executable( NAME       mpeg-gsc-metrics
                               ${CMAKE_SOURCE_DIR}/dependencies/glad/include
                               ${GLFW_INCLUDE_DIR} 
                               ${CMAKE_CURRENT_BINARY_DIR}
-                   LIBRARIES  ${GLFW_LIBRARIES} )  
-
+                   LIBRARIES  ${LIBS} )  

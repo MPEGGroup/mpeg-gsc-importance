@@ -36,7 +36,9 @@
 #include "pointcloud.hpp"
 #include "image.hpp"
 #include "viewpoints.hpp"
+#if defined( USE_OPENMP )
 #include <omp.h>
+#endif
 
 RasterizerSoftware::RasterizerSoftware() {}
 
@@ -189,8 +191,8 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
             if ( test_t < 0.0001f ) {
               done[0].get( u, v ) = 1;
             } else {
-              value.rgb += color.rgb * alpha * t;
-              value.a = test_t;
+              value.rgb = glm::clamp( value.rgb + color.rgb * alpha * t, glm::vec3( 0.0f ), glm::vec3( 1.0f ) );
+              value.a   = std::clamp( test_t, 0.0f, 1.0f );
             }
           }
         }

@@ -55,5 +55,7 @@ class Rasterizer {
  private:
   bool                                useSoftware_;
   std::unique_ptr<RasterizerSoftware> rasterizerSoftware_;
+#if defined( USE_GLFW )
   std::unique_ptr<RasterizerHardware> rasterizerHardware_;
+#endif
 };
