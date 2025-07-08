@@ -58,21 +58,21 @@ glm::vec4 computeRadiance( const glm::vec4 sh[16], const glm::vec3 direction, fl
                         1.445305721320277f,   -0.5900435899266435f };
   glm::vec3   v     = glm::normalize( direction );
   float       xx = v.x * v.x, yy = v.y * v.y, zz = v.z * v.z, xy = v.x * v.y, yz = v.y * v.z, xz = v.x * v.z;
-  glm::vec3   color = C[0] * sh[0].xyz;
-  color += C[1] * ( -v.y * sh[1].xyz + v.z * sh[2].xyz - v.x * sh[3].xyz );    //
-  color += C[2] * xy * sh[4].xyz                                               //
-           + C[3] * yz * sh[5].xyz                                             //
-           + C[4] * ( 2.0f * zz - xx - yy ) * sh[6].xyz                        //
-           + C[5] * xz * sh[7].xyz                                             //
-           + C[6] * ( xx - yy ) * sh[8].xyz;                                   //
-  color += C[7] * v.y * ( 3.0f * xx - yy ) * sh[9].xyz                         //
-           + C[8] * xy * v.z * sh[10].xyz                                      //
-           + C[9] * v.y * ( 4.0f * zz - xx - yy ) * sh[11].xyz                 //
-           + C[10] * v.z * ( 2.0f * zz - 3.0f * xx - 3.0f * yy ) * sh[12].xyz  //
-           + C[11] * v.x * ( 4.0f * zz - xx - yy ) * sh[13].xyz                //
-           + C[12] * v.z * ( xx - yy ) * sh[14].xyz                            //
-           + C[13] * v.x * ( xx - 3.0f * yy ) * sh[15].xyz;                    //
-  color += 0.5f;                                                               //
+  glm::vec3   color = C[0] * sh[0].xyz();
+  color += C[1] * ( -v.y * sh[1].xyz() + v.z * sh[2].xyz() - v.x * sh[3].xyz() );  //
+  color += C[2] * xy * sh[4].xyz()                                                 //
+           + C[3] * yz * sh[5].xyz()                                               //
+           + C[4] * ( 2.0f * zz - xx - yy ) * sh[6].xyz()                          //
+           + C[5] * xz * sh[7].xyz()                                               //
+           + C[6] * ( xx - yy ) * sh[8].xyz();                                     //
+  color += C[7] * v.y * ( 3.0f * xx - yy ) * sh[9].xyz()                           //
+           + C[8] * xy * v.z * sh[10].xyz()                                        //
+           + C[9] * v.y * ( 4.0f * zz - xx - yy ) * sh[11].xyz()                   //
+           + C[10] * v.z * ( 2.0f * zz - 3.0f * xx - 3.0f * yy ) * sh[12].xyz()    //
+           + C[11] * v.x * ( 4.0f * zz - xx - yy ) * sh[13].xyz()                  //
+           + C[12] * v.z * ( xx - yy ) * sh[14].xyz()                              //
+           + C[13] * v.x * ( xx - 3.0f * yy ) * sh[15].xyz();                      //
+  color += 0.5f;                                                                   //
   return glm::vec4( glm::clamp( color, glm::vec3( 0. ), glm::vec3( 1. ) ), opacity );
 }
 
@@ -97,7 +97,7 @@ glm::mat2 computeCovariance2D( glm::vec3 mean,
                                glm::mat3 projMat,
                                glm::vec2 window ) {
   glm::mat3   covarC = viewMat * covar * transpose( viewMat );
-  glm::vec2   c      = 0.5f * window.xy;
+  glm::vec2   c      = 0.5f * window.xy();
   glm::vec2   f      = glm::vec2( projMat[0][0], projMat[1][1] ) * c;
   glm::vec2   tanFov = glm::vec2( c.x / projMat[0][0], c.y / f.y );
   glm::vec2   minXY  = ( c / f ) * glm::vec2( 1.3 );
@@ -162,15 +162,15 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
     glm::vec4   p       = projMat * t;
     glm::vec3   ndc     = glm::vec3( p.x / p.w, p.y / p.w, p.z / p.w );
     glm::mat3   covar3d = computeCovariance3D( gs.rotate_, gs.scale_ );
-    glm::mat2   covar2d = computeCovariance2D( t.xyz, covar3d, glm::mat3( viewMat ), glm::mat3( projMat ), window );
+    glm::mat2   covar2d = computeCovariance2D( t.xyz(), covar3d, glm::mat3( viewMat ), glm::mat3( projMat ), window );
     glm::vec3   conic   = computeConic( covar2d, radius );
-    glm::vec4   color   = computeRadiance( gs.sh_, gs.xyz_.xyz - pos, gs.opacity_ );
-    glm::vec2   screen  = halfWindow * ndc.xy + halfWindow;
+    glm::vec4   color   = computeRadiance( gs.sh_, gs.xyz_.xyz() - pos, gs.opacity_ );
+    glm::vec2   screen  = halfWindow * ndc.xy() + halfWindow;
 
     // Frament shader
     glm::vec3 P[4];
     float     z = ndc.z * 0.5f + 0.5f;
-    for ( size_t j = 0; j < 4; j++ ) P[j] = glm::vec3( screen + offsets[j].xy * radius, z );
+    for ( size_t j = 0; j < 4; j++ ) P[j] = glm::vec3( screen + offsets[j].xy() * radius, z );
     int32_t minU = std::max( (int)( std::floor( std::min( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), 0 );
     int32_t minV = std::max( (int)( std::floor( std::min( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), 0 );
     int32_t maxU = std::min( (int)( std::ceil( std::max( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), width - 1 );
@@ -182,17 +182,16 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
           glm::vec2 d     = screen - glm::vec2( u + 0.5, v + 0.5 );
           float     sigma = 0.5 * ( conic.x * d.x * d.x + conic.z * d.y * d.y ) + conic.y * d.x * d.y;
           if ( sigma < 0.0f ) continue;
-          float alpha = std::min( color.a * exp( -sigma ), 0.999f );
+          float alpha = std::min( static_cast<float>( color.w * std::exp( -sigma ) ), 0.999f );
           if ( alpha >= ( 1.0f / 255.0f ) ) {
             if ( alpha >= ( 10.0f / 255.0f ) ) ocm[0].get( u, v ) = 255;
             auto& value  = buffer[0].get( u, v );
-            float t      = value.a;
+            float t      = value.w;
             float test_t = t * ( 1.0 - alpha );
-            if ( test_t < 0.0001f ) {
+            if ( test_t <= 1e-4f ) {
               done[0].get( u, v ) = 1;
             } else {
-              value.rgb = glm::clamp( value.rgb + color.rgb * alpha * t, glm::vec3( 0.0f ), glm::vec3( 1.0f ) );
-              value.a   = std::clamp( test_t, 0.0f, 1.0f );
+              value = glm::vec4( value.xyz() + color.xyz() * alpha * t, test_t );
             }
           }
         }

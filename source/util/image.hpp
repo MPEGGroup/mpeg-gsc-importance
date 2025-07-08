@@ -313,31 +313,31 @@ class Image {
       const float scale = 255.f;
       for ( int i = 0; i < size; ++i ) {
         const glm::vec4& c  = buffer.plane( 0 ).get( i );
-        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.r * scale ), 0.f, 255.f ) );
-        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.g * scale ), 0.f, 255.f ) );
-        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.b * scale ), 0.f, 255.f ) );
+        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.x * scale ), 0.f, 255.f ) );
+        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.y * scale ), 0.f, 255.f ) );
+        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.z * scale ), 0.f, 255.f ) );
         if constexpr ( N == 4 ) {
-          planes_[3].get( i ) = static_cast<T>( std::round( std::clamp( c.a * scale + 0.5f, 0.f, 255.f ) ) );
+          planes_[3].get( i ) = static_cast<T>( std::round( std::clamp( c.w * scale + 0.5f, 0.f, 255.f ) ) );
         }
       }
     } else if constexpr ( std::is_same_v<T, uint16_t> ) {
       const float scale = 65535.f;
       for ( int i = 0; i < size; ++i ) {
         const glm::vec4& c  = buffer.plane( 0 ).get( i );
-        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.r * scale ), 0.f, 65535.f ) );
-        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.g * scale ), 0.f, 65535.f ) );
-        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.b * scale ), 0.f, 65535.f ) );
+        planes_[0].get( i ) = static_cast<T>( std::clamp( std::round( c.x * scale ), 0.f, 65535.f ) );
+        planes_[1].get( i ) = static_cast<T>( std::clamp( std::round( c.y * scale ), 0.f, 65535.f ) );
+        planes_[2].get( i ) = static_cast<T>( std::clamp( std::round( c.z * scale ), 0.f, 65535.f ) );
         if constexpr ( N == 4 ) {
-          planes_[3].get( i ) = static_cast<T>( std::clamp( std::round( c.a * scale ), 0.f, 65535.f ) );
+          planes_[3].get( i ) = static_cast<T>( std::clamp( std::round( c.w * scale ), 0.f, 65535.f ) );
         }
       }
     } else if constexpr ( std::is_same_v<T, float> ) {
       for ( int i = 0; i < size; ++i ) {
         const glm::vec4& c  = buffer.plane( 0 ).get( i );
-        planes_[0].get( i ) = c.r;
-        planes_[1].get( i ) = c.g;
-        planes_[2].get( i ) = c.b;
-        if constexpr ( N == 4 ) { planes_[3].get( i ) = c.a; }
+        planes_[0].get( i ) = std::clamp( c.x, 0.f, 1.f );
+        planes_[1].get( i ) = std::clamp( c.y, 0.f, 1.f );
+        planes_[2].get( i ) = std::clamp( c.z, 0.f, 1.f );
+        if constexpr ( N == 4 ) { planes_[3].get( i ) = std::clamp( c.w, 0.f, 1.f ); }
       }
     } else {
       fprintf( stderr, "Error: unsupported template type in %s\n", __FILE__ );
@@ -463,7 +463,7 @@ class Video {
 
   bool save( const std::string& prefix, const bool planar = false ) const {
     auto filename = prefix + "_" + std::to_string( width_ ) + "x" + std::to_string( height_ ) + "_" +
-                    std::to_string( sizeof( T ) * 8 ) + "b_" + ( planar ? "p" : "i" ) + "444" + ".rgb ";
+                    std::to_string( sizeof( T ) * 8 ) + "b_" + ( planar ? "p" : "i" ) + "444" + ".rgb";
     std::ofstream file( filename, std::ios::binary );
     if ( !file.is_open() ) {
       printf( "Error: Unable to open file %s for writing.\n", filename.c_str() );

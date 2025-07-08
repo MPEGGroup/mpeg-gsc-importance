@@ -72,10 +72,10 @@
 #include <sys/dir.h>
 #endif
 
-#define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/ext/matrix_relational.hpp>
+#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
+#include <glm/ext/matrix_relational.hpp>
 #include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
