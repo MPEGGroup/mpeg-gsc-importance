@@ -82,7 +82,7 @@ bool RasterizerHardware::initialize() {
   glBindFramebuffer( GL_FRAMEBUFFER, fbo_ );
   glGenRenderbuffers( 1, &fboTexture_ );
   glBindRenderbuffer( GL_RENDERBUFFER, fboTexture_ );
-  glRenderbufferStorage( GL_RENDERBUFFER, GL_RGBA, width_, height_ );
+  glRenderbufferStorage( GL_RENDERBUFFER, GL_RGBA32F, width_, height_ );
   glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, fboTexture_ );
   GLenum status;
   status = glCheckFramebufferStatus( GL_FRAMEBUFFER );

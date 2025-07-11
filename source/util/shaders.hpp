@@ -85,7 +85,7 @@ static const std::string g_splatVertexShader = SHADERR( R"(
                + C[12] * v.z * (xx - yy)                           * sh[14].xyz 
                + C[13] * v.x * (xx - 3.0f * yy)                    * sh[15].xyz;             
     color     += 0.5f; 
-    return vec4( clamp(color, vec3(0.), vec3(1.)), opacity);
+    return vec4( color, opacity);
   }
 
   mat3 quatToRotation(vec4 q) {

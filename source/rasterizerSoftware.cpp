@@ -73,7 +73,7 @@ glm::vec4 computeRadiance( const glm::vec4 sh[16], const glm::vec3 direction, fl
            + C[12] * v.z * ( xx - yy ) * sh[14].xyz()                              //
            + C[13] * v.x * ( xx - 3.0f * yy ) * sh[15].xyz();                      //
   color += 0.5f;                                                                   //
-  return glm::vec4( glm::clamp( color, glm::vec3( 0. ), glm::vec3( 1. ) ), opacity );
+  return glm::vec4( color, opacity );
 }
 
 glm::mat3 quatToRotation( glm::quat q ) {
