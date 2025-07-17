@@ -208,6 +208,11 @@ static std::string getBasename( const std::string& string ) {
   return string;
 }
 
+static std::string getLabel( const std::string& path ) {
+  const auto parent = getBasename( getDirectory( path ) );
+  return parent.empty() ? getBasename( path ) : parent + getSeparator( path ) + getBasename( path );
+}
+
 static std::string formatCode( const std::string& eCode ) {
   std::istringstream shaderStream( eCode );
   std::string        line;

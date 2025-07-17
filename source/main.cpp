@@ -64,6 +64,9 @@ struct Parameters {
   int32_t     onlyViewpoint_     = -1;
   int32_t     width_             = 1024;
   int32_t     height_            = 768;
+  std::string outputPath_        = "";
+  bool        computeOm_         = true;
+  bool        computeSsim_       = true;
 
   bool parse( int32_t argc, char* argv[] ) {
     namespace po = df::program_options_lite;
@@ -97,8 +100,11 @@ struct Parameters {
         ("float",             useFloat_,          useFloat_,          "Use floatting point images")
         ("compareCpuGpu",     compareCpuGpu_,     compareCpuGpu_,     "Compare CPU/GPU rendering")
 
-      ( po::Section("Options") )      
+      ( po::Section("Output options") )      
         ("s,save",            save_,              save_,              "Save generated videos")
+        ("o,output",          outputPath_,        outputPath_,        "Output text file for metrics")
+        ("computeOm",         computeOm_,         computeOm_,         "Compute OM metrics (OM-PSNR and OM-SSIM)")
+        ("computeSsim",       computeSsim_,       computeSsim_,       "Compute SSIM metrics")
       ;
 
     /* clang-format on */
@@ -154,6 +160,7 @@ int main( int32_t argc, char* argv[] ) {
                                                    Image<uint8_t, 3>( params.width_, params.height_ ) };
   auto              imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
                                                     Image<uint8_t, 1>( params.width_, params.height_ ) };
+  Image<uint8_t, 1> imageOcmUnion;
   Video<uint8_t, 1> videoOcm[2];
   Video<uint8_t, 3> videoImg[2];
   Metric            metric;
@@ -173,14 +180,21 @@ int main( int32_t argc, char* argv[] ) {
     // Create viewpoint list
     if ( viewpoints.size() == 0 ) {
       if ( params.useCameraPosition_ ) {
-        auto& cameraPosition = pc[0].getCameraPosition();
-        if ( cameraPosition.size() == 0 ) {
-          printf( "Error: camera position is not correclty defined in src ply files \n" );
+        auto& cameraPosition0 = pc[0].getCameraPosition();
+        auto& cameraPosition1 = pc[1].getCameraPosition();
+        if ( cameraPosition0.size() == 0 && cameraPosition1.size() == 0 ) {
+          printf( "Error: camera position is not correclty defined in the ply files \n" );
           return 1;
         }
-        viewpoints.resize( cameraPosition.size() );
-        for ( size_t i = 0; i < cameraPosition.size(); i++ ) {
-          const auto& el = cameraPosition[i];
+        if ( cameraPosition0.size() == 0 ) cameraPosition0 = cameraPosition1;
+        if ( cameraPosition1.size() == 0 ) cameraPosition1 = cameraPosition0;
+        if ( cameraPosition0 != cameraPosition1 ) {
+          printf( "Error: camera position of the two ply files are not equals\n" );
+          return 1;
+        }
+        viewpoints.resize( cameraPosition0.size() );
+        for ( size_t i = 0; i < cameraPosition0.size(); i++ ) {
+          const auto& el = cameraPosition0[i];
           viewpoints[i].set( el.pos(), el.view(), el.up() );
           if ( params.verbose_ ) el.log();
         }
@@ -191,9 +205,11 @@ int main( int32_t argc, char* argv[] ) {
         auto [minBound, maxBound] = pc[0].getBoundingBox();
         // viewpoints.create( params.numPoints_, ( maxBound + minBound ) * 0.5f );
         auto center = ( maxBound + minBound ) * 0.5f;
-        logVec3( "minBound", minBound );
-        logVec3( "maxBound", maxBound );
-        logVec3( "center", center );
+        if ( params.verbose_ ) {
+          logVec3( "minBound", minBound );
+          logVec3( "maxBound", maxBound );
+          logVec3( "center", center );
+        }
         viewpoints.create( params.numPoints_, center );
         if ( params.saveViewpoints_ ) viewpoints.write( "viewpoint.txt" );
         if ( params.verbose_ ) {
@@ -247,18 +263,39 @@ int main( int32_t argc, char* argv[] ) {
         for ( int32_t i = 0; i < 2; i++ ) videoOcm[i].add( imageOcm[i] );
       }
 
+      // Compute the union of two masks (ocm_union)
+      timer.tic( "UnionMask" );
+      if ( imageOcmUnion.width() != params.width_ || imageOcmUnion.height() != params.height_ ) {
+        imageOcmUnion.resize( params.width_, params.height_ );
+      }
+      for ( int32_t y = 0; y < params.height_; y++ ) {
+        for ( int32_t x = 0; x < params.width_; x++ ) {
+          uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
+          uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
+          // Compute union valid if any value is 255
+          imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
+        }
+      }
+      timer.toc( "UnionMask", params.verbose_ );
       // Metric
       timer.tic( "Metric" );
       if ( params.useFloat_ )
-        metric.compute( imageFloat[0], imageFloat[1] );
+        metric.compute( imageFloat[0], imageFloat[1], imageOcmUnion );
       else
-        metric.compute( imageUint8[0], imageUint8[1] );
+        metric.compute( imageUint8[0], imageUint8[1], imageOcmUnion );
       timer.toc( "Metric", params.verbose_ );
     }
   }
 
   // Show metric results
-  metric.getAverage().log( getBasename( params.decodePath_ ) );
+  Results avgResults = metric.getAverage();
+  avgResults.log( getBasename( params.decodePath_ ) );
+
+  // Save the results to a file
+  if ( !params.outputPath_.empty() ) {
+    avgResults.saveToFile( params.outputPath_, getLabel( params.decodePath_ ) );
+    printf( "Metrics saved to %s\n", params.outputPath_.c_str() );
+  }
   if ( params.verbose_ ) timer.trace();
 
   // Save

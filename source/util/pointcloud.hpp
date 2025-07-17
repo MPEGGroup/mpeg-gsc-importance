@@ -86,6 +86,22 @@ struct CameraPosition {
     updateView( eEye, eCenter, eUp );
     return eUp;
   }
+  bool operator==( const CameraPosition& other ) const {
+    return index_ == other.index_ && cameraId_ == other.cameraId_ && position_ == other.position_ &&
+           orientation_ == other.orientation_ && focal_ == other.focal_ && name_ == other.name_;
+  }
+  bool            operator!=( const CameraPosition& other ) const { return !( *this == other ); }
+  CameraPosition& operator=( const CameraPosition& other ) {
+    if ( this != &other ) {
+      index_       = other.index_;
+      cameraId_    = other.cameraId_;
+      position_    = other.position_;
+      orientation_ = other.orientation_;
+      focal_       = other.focal_;
+      name_        = other.name_;
+    }
+    return *this;
+  }
 };
 
 static void traceSH( const GaussianData& gs ) {
