@@ -48,7 +48,7 @@ std::vector<std::vector<double>> generate_gaussian_window( int window_size, doub
 inline std::ostream& operator<<( std::ostream& os, const glm::dvec3& v ) {
   std::ios_base::fmtflags f( os.flags() );
   std::streamsize         p = os.precision();
-  os << std::setw( 12 ) << v.x << " " << std::setw( 12 ) << v.y << " " << std::setw( 12 ) << v.z;
+  os << std::setw( 16 ) << v.x << " " << std::setw( 16 ) << v.y << " " << std::setw( 16 ) << v.z;
   os.flags( f );
   os.precision( p );
   return os;
@@ -157,28 +157,28 @@ struct Results {
 
  private:
   void writeMetrics( std::ostream& os, const std::string& name = "" ) const {
-    os << std::fixed << std::setprecision( 4 );
+    os << std::fixed << std::setprecision( 8 );
     os << "Metric " << ( name.empty() ? "" : name ) << ":\n"
        << "Mse RGB            = " << mseRgb_ << "\n"
        << "Psnr RGB           = " << psnrRgb_ << "\n"
-       << "Psnr RGB (avg)     = " << std::setw( 12 ) << psnrRgbAvg_ << "\n"
+       << "Psnr RGB (avg)     = " << std::setw( 16 ) << psnrRgbAvg_ << "\n"
        << "Mse YUV            = " << mseYuv_ << "\n"
        << "Psnr YUV           = " << psnrYuv_ << "\n"
-       << "Psnr YUV (wavg)    = " << std::setw( 12 ) << psnrYuvWavg_ << "\n"
+       << "Psnr YUV (wavg)    = " << std::setw( 16 ) << psnrYuvWavg_ << "\n"
        << "OM-Mse RGB         = " << mseRgbOm_ << "\n"
        << "OM-Psnr RGB        = " << psnrRgbOm_ << "\n"
-       << "OM-Psnr RGB (avg)  = " << std::setw( 12 ) << psnrRgbOmAvg_ << "\n"
+       << "OM-Psnr RGB (avg)  = " << std::setw( 16 ) << psnrRgbOmAvg_ << "\n"
        << "OM-Mse YUV         = " << mseYuvOm_ << "\n"
        << "OM-Psnr YUV        = " << psnrYuvOm_ << "\n"
-       << "OM-Psnr YUV (wavg) = " << std::setw( 12 ) << psnrYuvOmWavg_ << "\n"
+       << "OM-Psnr YUV (wavg) = " << std::setw( 16 ) << psnrYuvOmWavg_ << "\n"
        << "SSIM               = " << ssim_ << "\n"
-       << "SSIM Avg           = " << std::setw( 12 ) << ssimAvg_ << "\n"
+       << "SSIM Avg           = " << std::setw( 16 ) << ssimAvg_ << "\n"
        << "OM-SSIM            = " << ssimOm_ << "\n"
-       << "OM-SSIM Avg        = " << std::setw( 12 ) << ssimOmAvg_ << "\n"
-       << "IVSSIM RGB         = " << std::setw( 12 ) << rgbIvSsim_ << "\n"
-       << "IVSSIM YUV         = " << std::setw( 12 ) << yuvIvSsim_ << "\n";
+       << "OM-SSIM Avg        = " << std::setw( 16 ) << ssimOmAvg_ << "\n"
+       << "IVSSIM RGB         = " << std::setw( 16 ) << rgbIvSsim_ << "\n"
+       << "IVSSIM YUV         = " << std::setw( 16 ) << yuvIvSsim_ << "\n";
     os << std::fixed << std::setprecision( 2 );
-    os << "Occupancy          = " << std::setw( 12 ) << occupancyRate_ << "%\n";
+    os << "Occupancy          = " << std::setw( 16 ) << occupancyRate_ << "%\n";
   }
 };
 
