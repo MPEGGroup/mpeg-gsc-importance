@@ -44,6 +44,10 @@
 #include "metric.hpp"
 #include "timer.hpp"
 
+#if defined( USE_OPENMP )
+#include <omp.h>
+#endif
+
 // Parse input command line
 struct Parameters {
   bool        verbose_           = false;
@@ -150,17 +154,11 @@ int main( int32_t argc, char* argv[] ) {
 
   Parameters params;
   if ( params.parse( argc, argv ) ) { return 1; }
+  auto start = std::chrono::high_resolution_clock::now();
 
   Viewpoints viewpoints;
   if ( !params.viewpointPath_.empty() ) { viewpoints.read( params.viewpointPath_ ); }
 
-  auto              imageFloat = std::array<Image<float>, 2>{ Image<float, 3>( params.width_, params.height_ ),
-                                                 Image<float, 3>( params.width_, params.height_ ) };
-  auto              imageUint8 = std::array<Image<uint8_t>, 2>{ Image<uint8_t, 3>( params.width_, params.height_ ),
-                                                   Image<uint8_t, 3>( params.width_, params.height_ ) };
-  auto              imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
-                                                    Image<uint8_t, 1>( params.width_, params.height_ ) };
-  Image<uint8_t, 1> imageOcmUnion;
   Video<uint8_t, 1> videoOcm[2];
   Video<uint8_t, 3> videoImg[2];
   Metric            metric;
@@ -199,13 +197,9 @@ int main( int32_t argc, char* argv[] ) {
           if ( params.verbose_ ) el.log();
         }
         params.numPoints_ = viewpoints.size();
-        // if ( params.numPoints_ != 0 && params.numPoints_ < viewpoints.size() ) {
-        //   viewpoints.resize( params.numPoints_ );
-        // }
       } else {
         auto [minBound, maxBound] = pc[0].getBoundingBox();
-        // viewpoints.create( params.numPoints_, ( maxBound + minBound ) * 0.5f );
-        auto center = ( maxBound + minBound ) * 0.5f;
+        auto center               = ( maxBound + minBound ) * 0.5f;
         if ( params.verbose_ ) {
           logVec3( "minBound", minBound );
           logVec3( "maxBound", maxBound );
@@ -227,64 +221,84 @@ int main( int32_t argc, char* argv[] ) {
       return 0;
     }
 
-    // Rendering
-    for ( size_t viewpointIndex = 0; viewpointIndex < viewpoints.size(); viewpointIndex++ ) {
-      auto& viewpoint = viewpoints[viewpointIndex];
-      if ( params.onlyViewpoint_ != -1 && viewpointIndex != params.onlyViewpoint_ ) continue;
-      if ( params.verbose_ ) {
-        printf( "Frame %3d / %3d: viewpoints %3zu / %3zu \n", frameIndex, params.frameCount_, viewpointIndex,
-                viewpoints.size() );
-        fflush( stdout );
-      }
-      // Rasterize
-      timer.tic( "Rasterize" );
-      if ( !params.compareCpuGpu_ ) {
-        for ( int32_t i = 0; i < 2; i++ )
-          if ( params.useFloat_ )
-            rasterizer.render( pc[i], viewpoint, imageFloat[i], imageOcm[i] );
-          else
-            rasterizer.render( pc[i], viewpoint, imageUint8[i], imageOcm[i] );
-      } else {
-        if ( params.useFloat_ ) {
-          rasterizerCpu.render( pc[0], viewpoint, imageFloat[0], imageOcm[0] );
-          rasterizerGpu.render( pc[1], viewpoint, imageFloat[1], imageOcm[1] );
+    // Resize
+    if ( params.save_ ) {
+      auto numFrames = videoImg[0].size() + viewpoints.size();
+      for ( int32_t i = 0; i < 2; i++ ) videoImg[i].resize( numFrames, params.width_, params.height_ );
+      for ( int32_t i = 0; i < 2; i++ ) videoOcm[i].resize( numFrames, params.width_, params.height_ );
+    }
+
+// Rendering
+#pragma omp parallel if ( params.useCPU_ )
+    {
+#pragma omp for
+      for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
+        auto  imageFloat = std::array<Image<float>, 2>{ Image<float, 3>( params.width_, params.height_ ),
+                                                       Image<float, 3>( params.width_, params.height_ ) };
+        auto  imageUint8 = std::array<Image<uint8_t>, 2>{ Image<uint8_t, 3>( params.width_, params.height_ ),
+                                                         Image<uint8_t, 3>( params.width_, params.height_ ) };
+        auto  imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
+                                                          Image<uint8_t, 1>( params.width_, params.height_ ) };
+        auto& viewpoint  = viewpoints[viewpointIndex];
+        if ( params.onlyViewpoint_ != -1 && viewpointIndex != params.onlyViewpoint_ ) continue;
+        if ( params.verbose_ ) {
+          printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
+                  viewpoints.size() );
+#if defined( USE_OPENMP )
+          printf( "Thread %2d / %2d ", omp_get_thread_num(), omp_get_num_threads() );
+#endif
+          printf( "\n" );
+          fflush( stdout );
+        }
+        // Rasterize
+        timer.tic( "Rasterize" );
+        if ( !params.compareCpuGpu_ ) {
+          for ( int32_t i = 0; i < 2; i++ )
+            if ( params.useFloat_ )
+              rasterizer.render( pc[i], viewpoint, imageFloat[i], imageOcm[i] );
+            else
+              rasterizer.render( pc[i], viewpoint, imageUint8[i], imageOcm[i] );
         } else {
-          rasterizerCpu.render( pc[0], viewpoint, imageUint8[0], imageOcm[0] );
-          rasterizerGpu.render( pc[1], viewpoint, imageUint8[1], imageOcm[1] );
+          if ( params.useFloat_ ) {
+            rasterizerCpu.render( pc[0], viewpoint, imageFloat[0], imageOcm[0] );
+            rasterizerGpu.render( pc[1], viewpoint, imageFloat[1], imageOcm[1] );
+          } else {
+            rasterizerCpu.render( pc[0], viewpoint, imageUint8[0], imageOcm[0] );
+            rasterizerGpu.render( pc[1], viewpoint, imageUint8[1], imageOcm[1] );
+          }
         }
-      }
-      timer.toc( "Rasterize", params.verbose_ );
+        timer.toc( "Rasterize", params.verbose_ );
 
-      // Save
-      if ( params.save_ ) {
+        // Save
+        if ( params.save_ ) {
+          uint32_t frameIndex = videoImg[0].size() - viewpoints.size() + viewpointIndex;
+          if ( params.useFloat_ )
+            for ( int32_t i = 0; i < 2; i++ ) videoImg[i][frameIndex] = imageFloat[i];
+          else
+            for ( int32_t i = 0; i < 2; i++ ) videoImg[i][frameIndex] = imageUint8[i];
+          for ( int32_t i = 0; i < 2; i++ ) videoOcm[i][frameIndex] = imageOcm[i];
+        }
+
+        // Compute the union of two masks (ocm_union)
+        timer.tic( "UnionMask" );
+        Image<uint8_t, 1> imageOcmUnion( params.width_, params.height_ );
+        for ( int32_t y = 0; y < params.height_; y++ ) {
+          for ( int32_t x = 0; x < params.width_; x++ ) {
+            uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
+            uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
+            imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
+          }
+        }
+        timer.toc( "UnionMask", params.verbose_ );
+
+        // Metric
+        timer.tic( "Metric" );
         if ( params.useFloat_ )
-          for ( int32_t i = 0; i < 2; i++ ) videoImg[i].add( imageFloat[i] );
+          metric.compute( imageFloat[0], imageFloat[1], imageOcmUnion );
         else
-          for ( int32_t i = 0; i < 2; i++ ) videoImg[i].add( imageUint8[i] );
-        for ( int32_t i = 0; i < 2; i++ ) videoOcm[i].add( imageOcm[i] );
+          metric.compute( imageUint8[0], imageUint8[1], imageOcmUnion );
+        timer.toc( "Metric", params.verbose_ );
       }
-
-      // Compute the union of two masks (ocm_union)
-      timer.tic( "UnionMask" );
-      if ( imageOcmUnion.width() != params.width_ || imageOcmUnion.height() != params.height_ ) {
-        imageOcmUnion.resize( params.width_, params.height_ );
-      }
-      for ( int32_t y = 0; y < params.height_; y++ ) {
-        for ( int32_t x = 0; x < params.width_; x++ ) {
-          uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
-          uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
-          // Compute union valid if any value is 255
-          imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
-        }
-      }
-      timer.toc( "UnionMask", params.verbose_ );
-      // Metric
-      timer.tic( "Metric" );
-      if ( params.useFloat_ )
-        metric.compute( imageFloat[0], imageFloat[1], imageOcmUnion );
-      else
-        metric.compute( imageUint8[0], imageUint8[1], imageOcmUnion );
-      timer.toc( "Metric", params.verbose_ );
     }
   }
 
@@ -330,7 +344,8 @@ int main( int32_t argc, char* argv[] ) {
     videoOcmDif.save( suffix + "_ocm_dif" );
     videoImgBty.save( suffix + "_img_bty" );
   }
-
+  std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
+  printf( "Total time: %.3f seconds\n", elapsed.count() );
   fflush( stdout );
   return 0;
 }

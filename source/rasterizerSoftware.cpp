@@ -175,7 +175,8 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
     int32_t minV = std::max( (int)( std::floor( std::min( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), 0 );
     int32_t maxU = std::min( (int)( std::ceil( std::max( { P[0].x, P[1].x, P[2].x, P[3].x } ) ) ), width - 1 );
     int32_t maxV = std::min( (int)( std::ceil( std::max( { P[0].y, P[1].y, P[2].y, P[3].y } ) ) ), height - 1 );
-#pragma omp for
+
+    // Rendering
     for ( int32_t v = minV; v <= maxV; ++v ) {
       for ( int32_t u = minU; u <= maxU; ++u ) {
         if ( done[0].get( u, v ) == 0 ) {

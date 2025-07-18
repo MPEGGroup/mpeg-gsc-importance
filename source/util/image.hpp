@@ -363,12 +363,12 @@ class Video {
 
   Video( const Video& videoA, const Video& videoB, bool butterfly = false ) {
     if ( videoA.height_ != videoB.height_ ) {
-      printf( "Heigth are not the same \n" );
+      printf( "Error: Heigth are not the same \n" );
       fflush( stdout );
       exit( -1 );
     }
     if ( videoA.size() != videoB.size() ) {
-      printf( "Size are not the same \n" );
+      printf( "Error: Size are not the same \n" );
       fflush( stdout );
       exit( -1 );
     }

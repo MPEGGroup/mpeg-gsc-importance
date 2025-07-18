@@ -433,39 +433,6 @@ class Pointcloud {
     return sorted;
   }
 
-  // std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar ) const {
-  //   const uint32_t        maxValue = std::numeric_limits<uint32_t>::max();
-  //   int32_t               count    = 0;
-  //   std::vector<uint32_t> depth( gaussianData_.size() ), gaussianData_.index( size() );
-  //   for ( auto& gs : gaussianData_ ) {
-  //     glm::vec4 p = modelViewProj * gs.xyz_;
-  //     if ( abs( p.x / p.w ) < 1.2 && abs( p.y / p.w ) < 1.2 && p.z > nearFar.x && p.z < nearFar.y ) {
-  //       depth[count] = uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) );
-  //       index[count] = i;
-  //       count++;
-  //     }
-  //   }
-  //   std::vector<uint32_t> indices( count ), sorted( count );
-  //   std::iota( indices.begin(), indices.end(), 0 );
-  //   std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] > depth[b]; } );
-  //   std::transform( indices.begin(), indices.end(), sorted.begin(), [&]( uint32_t idx ) { return index[idx]; } );
-  //   return sorted;
-  // }
-
-  // std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar ) const {
-  //   using Pair = std::pair<uint32_t, uint32_t>;
-  //   std::vector<Pair> valid;
-  //   for ( auto& gs : gaussianData_ ) {
-  //     glm::vec4 p = modelViewProj * gs.xyz_;
-  //     if ( abs( p.x / p.w ) < 1.2f && abs( p.y / p.w ) < 1.2f && p.z > nearFar.x && p.z < nearFar.y )
-  //       valid.emplace_back( i, uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) ) );
-  //   }
-  //   std::vector<uint32_t> sorted( valid.size() );
-  //   std::sort( valid.begin(), valid.end(), []( const Pair& a, const Pair& b ) { return a.second > b.second; } );
-  //   std::transform( valid.begin(), valid.end(), sorted.begin(), []( const auto& pair ) { return pair.first; } );
-  //   return sorted;
-  // }
-
  private:
   std::vector<GaussianData>   gaussianData_;
   std::vector<CameraPosition> cameraPosition_;
