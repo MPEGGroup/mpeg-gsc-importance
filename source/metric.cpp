@@ -149,6 +149,8 @@ template <typename T, int32_t N> void Metric::computeIVSSIM_(Results& Result, co
   PicB.extend();
 
   //calculate RGB IV-SSIM
+  ProcIVSSIM.setCmpWeightsSearch (xIVSSIM::c_EqualCmpWeights);
+  ProcIVSSIM.setCmpWeightsAverage(xIVSSIM::c_EqualCmpWeights);
   double IVSSIM_RGB = ProcIVSSIM.calcPicIVSSIM(&PicA, &PicB);
 
   //convert colorspace (in-place)
@@ -161,6 +163,8 @@ template <typename T, int32_t N> void Metric::computeIVSSIM_(Results& Result, co
   PicB.extend();
 
   //calculate YCbCr IV-SSIM
+  ProcIVSSIM.setCmpWeightsSearch (xIVSSIM::c_DefaultCmpWeights);
+  ProcIVSSIM.setCmpWeightsAverage(xIVSSIM::c_DefaultCmpWeights);
   double IVSSIM_YCbCr = ProcIVSSIM.calcPicIVSSIM(&PicA, &PicB);
 
   //store results
