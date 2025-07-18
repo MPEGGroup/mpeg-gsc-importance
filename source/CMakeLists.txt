@@ -30,6 +30,11 @@ if ( NOT USE_CPU_ONLY )
 #     endforeach()
 endif()
 
+list(APPEND LIBS ${LIB_PMBB_IVQM_NAME})
+list(APPEND LIBS ${LIB_PMBB_CORE_NAME})
+list(APPEND LIBS ${LIB_PMBB_BASE_NAME})
+list(APPEND LIBS fmt::fmt)
+
 IF(USE_OPENMP)
   list(APPEND LIBS OpenMP::OpenMP_CXX)
 ENDIF()
@@ -41,5 +46,9 @@ create_executable( NAME       mpeg-gsc-metrics
                               ${CMAKE_SOURCE_DIR}/dependencies/glm
                               ${CMAKE_SOURCE_DIR}/dependencies/glad/include
                               ${GLFW_INCLUDE_DIR} 
+                              ${fmtlib_SOURCE_DIR}/include
+                              ${${LIB_PMBB_BASE_NAME}_SOURCE_DIR}/src
+                              ${${LIB_PMBB_CORE_NAME}_SOURCE_DIR}/src
+                              ${${LIB_PMBB_IVQM_NAME}_SOURCE_DIR}/src
                               ${CMAKE_CURRENT_BINARY_DIR}
                    LIBRARIES  ${LIBS} )  

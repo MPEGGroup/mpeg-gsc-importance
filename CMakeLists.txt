@@ -56,6 +56,11 @@ if ( NOT USE_CPU_ONLY )
   include( dependencies/cmake/glfw.cmake )
 endif()
 
+include(dependencies/cmake/fmtlib.cmake)
+add_subdirectory(dependencies/pmbb-base    libpmbb-base)
+add_subdirectory(dependencies/pmbb-core    libpmbb-core)
+add_subdirectory(dependencies/pmbb-ivqm    libpmbb-ivqm)
+
 ## INCLUDE 
 INCLUDE_DIRECTORIES( ${CMAKE_SOURCE_DIR}/external/stb )
 IF ( APPLE )
