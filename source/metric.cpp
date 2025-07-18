@@ -36,6 +36,9 @@
 #include "pointcloud.hpp"
 #include "image.hpp"
 
+#include "xSSIM.h"
+#include "xColorSpace.h"
+
 Metric::Metric() {}
 
 Metric::~Metric() { results_.clear(); }
@@ -71,8 +74,101 @@ void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB ) {
     }
     res.rgbPSNR_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / ( res.rgbMSE_ / (double)size ) ) );
     res.yuvPSNR_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / ( res.yuvMSE_ / (double)size ) ) );
+
+    computeIVSSIM_(res, imageA, imageB);
   }
-  results_.push_back( res );
+  results_.push_back(res);
+}
+
+template <typename T, int32_t N> void convertBuffer(PMBB::xPicP& Dst, const Image<T, N>& Src)
+{
+  using namespace PMBB;
+
+  const int32 Width     = Dst.getWidth   ();
+  const int32 Height    = Dst.getHeight  ();
+  const int32 BitDepth  = Dst.getBitDepth();
+  const int32 DstStride = Dst.getStride  ();
+
+  for(int32 c = 0; c < 3; c++)
+  {
+    const Plane<T>& SrcPlane = Src.plane(c);
+    uint16*         DstPtr   = Dst.getAddr(eCmp(c));
+    
+    for(int32 y = 0; y < Height; y++)
+    {
+      for(int32 x = 0; x < Width; x++)
+      {
+        T SrcA = SrcPlane.get(x, y);
+        if constexpr(std::is_same_v<T, uint8_t > || std::is_same_v<T, uint16_t>)
+        {
+          DstPtr[x] = SrcA;
+        }
+        else if constexpr(std::is_same_v<T, float>)
+        {
+          DstPtr[x] = round(SrcA * xBitDepth2MaxValue(BitDepth));
+        }
+      }
+      DstPtr += DstStride;
+    }
+  }
+}
+
+template <typename T, int32_t N> void Metric::computeIVSSIM_(Results& Result, const Image<T, N>& imageA, const Image<T, N>& imageB)
+{
+  using namespace PMBB;
+
+  const int32 Width  = imageA.width ();
+  const int32 Height = imageA.height();
+
+  int32 BitDepth = NOT_VALID;
+  if      constexpr (std::is_same_v<T, uint8_t >) { BitDepth = 8 ; }
+  else if constexpr (std::is_same_v<T, uint16_t>) { BitDepth = 16; }
+  else if constexpr (std::is_same_v<T, float   >) { BitDepth = 16; }
+  else { static_assert(false, "Unsupported Image<T, N> type"); }
+
+  static_assert(N==3, "Unsupported number of components");
+
+  //create PMBB image buffers
+  xPicP PicA({ Width, Height }, BitDepth, 4);
+  xPicP PicB({ Width, Height }, BitDepth, 4);
+
+  //create IVSSIM calculator
+  xIVSSIM ProcIVSSIM;
+  ProcIVSSIM.create({ Width, Height }, BitDepth, 4, false);
+  ProcIVSSIM.createThrdPoolIntf(nullptr, 0); //create empty thread pool interface - don't use parallel processing here
+  ProcIVSSIM.setStructSimParams(xSSIM::eMode::BlockAveraged, false, 8, 4);
+  ProcIVSSIM.initRowBuffers(Height);
+
+  //copy/convert data from Image<T, N> to xPicP
+  convertBuffer<T, N>(PicA, imageA);
+  assert(PicA.check("imageA"));
+  PicA.extend();
+
+  convertBuffer<T, N>(PicB, imageB);
+  assert(PicB.check("imageB"));
+  PicB.extend();
+
+  //calculate RGB IV-SSIM
+  double IVSSIM_RGB = ProcIVSSIM.calcPicIVSSIM(&PicA, &PicB);
+
+  //convert colorspace (in-place)
+  xColorSpace::ConvertRGB2YCbCr(PicA.getAddr(eCmp::LM), PicA.getAddr(eCmp::CB), PicA.getAddr(eCmp::CR), PicA.getAddr(eCmp::R ), PicA.getAddr(eCmp::G ), PicA.getAddr(eCmp::B ),
+                                PicA.getStride(), PicA.getStride(), PicA.getWidth(), PicA.getHeight(), PicA.getBitDepth(), eClrSpcLC::BT709);
+  PicA.extend();
+
+  xColorSpace::ConvertRGB2YCbCr(PicB.getAddr(eCmp::LM), PicB.getAddr(eCmp::CB), PicB.getAddr(eCmp::CR), PicB.getAddr(eCmp::R ), PicB.getAddr(eCmp::G ), PicB.getAddr(eCmp::B ),
+                                PicB.getStride(), PicB.getStride(), PicB.getWidth(), PicB.getHeight(), PicB.getBitDepth(), eClrSpcLC::BT709);
+  PicB.extend();
+
+  //calculate YCbCr IV-SSIM
+  double IVSSIM_YCbCr = ProcIVSSIM.calcPicIVSSIM(&PicA, &PicB);
+
+  //store results
+  Result.rgbIVSSIM_ = IVSSIM_RGB  ;
+  Result.yuvIVSSIM_ = IVSSIM_YCbCr;
+
+  //cleanup
+  ProcIVSSIM.destroy();
 }
 
 Results Metric::getAverage() {

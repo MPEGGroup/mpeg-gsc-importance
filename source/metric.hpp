@@ -45,19 +45,26 @@ struct Results {
   glm::dvec3 yuvMSE_  = { 0.0, 0.0, 0.0 };
   glm::dvec3 yuvPSNR_ = { 0.0, 0.0, 0.0 };
 
+  double     rgbIVSSIM_ = 0.0;
+  double     yuvIVSSIM_ = 0.0;
+
   Results& operator+=( const Results& other ) {
-    rgbMSE_ += other.rgbMSE_;
-    rgbPSNR_ += other.rgbPSNR_;
-    yuvMSE_ += other.yuvMSE_;
-    yuvPSNR_ += other.yuvPSNR_;
+    rgbMSE_    += other.rgbMSE_;
+    rgbPSNR_   += other.rgbPSNR_;
+    yuvMSE_    += other.yuvMSE_;
+    yuvPSNR_   += other.yuvPSNR_;
+    rgbIVSSIM_ += other.rgbIVSSIM_;
+    yuvIVSSIM_ += other.yuvIVSSIM_;
     return *this;
   }
 
   Results& operator/=( double divisor ) {
-    rgbMSE_ /= divisor;
-    rgbPSNR_ /= divisor;
-    yuvMSE_ /= divisor;
-    yuvPSNR_ /= divisor;
+    rgbMSE_    /= divisor;
+    rgbPSNR_   /= divisor;
+    yuvMSE_    /= divisor;
+    yuvPSNR_   /= divisor;
+    rgbIVSSIM_ /= divisor;
+    yuvIVSSIM_ /= divisor;
     return *this;
   }
 
@@ -65,9 +72,12 @@ struct Results {
     printf(
         "Metric %s: "
         "MSE RGB = %12.6f %12.6f %12.6f PSNR RGB = %12.6f %12.6f %12.6f "
-        "MSE YUV = %12.6f %12.6f %12.6f PSNR YUV = %12.6f %12.6f %12.6f \n",
-        name.empty() ? "" : name.c_str(), rgbMSE_[0], rgbMSE_[1], rgbMSE_[2], rgbPSNR_[0], rgbPSNR_[1], rgbPSNR_[2],
-        yuvMSE_[0], yuvMSE_[1], yuvMSE_[2], yuvPSNR_[0], yuvPSNR_[1], yuvPSNR_[2] );
+        "MSE YUV = %12.6f %12.6f %12.6f PSNR YUV = %12.6f %12.6f %12.6f "
+        "IVSSIM RGB = %12.10f IVSSIM YUV = %12.10f \n",
+        name.empty() ? "" : name.c_str(),
+        rgbMSE_[0], rgbMSE_[1], rgbMSE_[2], rgbPSNR_[0], rgbPSNR_[1], rgbPSNR_[2],
+        yuvMSE_[0], yuvMSE_[1], yuvMSE_[2], yuvPSNR_[0], yuvPSNR_[1], yuvPSNR_[2],
+        rgbIVSSIM_, yuvIVSSIM_);
   }
 };
 
@@ -84,4 +94,5 @@ class Metric {
 
  private:
   std::vector<Results> results_;
+  template <typename T, int32_t N> void computeIVSSIM_(Results& Result, const Image<T, N>& imageA, const Image<T, N>& imageB);
 };
