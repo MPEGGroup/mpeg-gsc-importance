@@ -198,9 +198,10 @@ int main( int32_t argc, char* argv[] ) {
           viewpoints[i].set( el.pos(), el.view(), el.up() );
           if ( params.verbose_ ) el.log();
         }
-        if ( params.numPoints_ != 0 && params.numPoints_ < viewpoints.size() ) {
-          viewpoints.resize( params.numPoints_ );
-        }
+        params.numPoints_ = viewpoints.size();
+        // if ( params.numPoints_ != 0 && params.numPoints_ < viewpoints.size() ) {
+        //   viewpoints.resize( params.numPoints_ );
+        // }
       } else {
         auto [minBound, maxBound] = pc[0].getBoundingBox();
         // viewpoints.create( params.numPoints_, ( maxBound + minBound ) * 0.5f );
