@@ -82,7 +82,8 @@
     "mutex": "cpp",
     "stop_token": "cpp",
     "thread": "cpp",
-    "xstddef": "cpp"
+    "xstddef": "cpp",
+    "future": "cpp"
   },
   "C_Cpp.errorSquiggles": "disabled",
   "cmake.buildType": "Release",

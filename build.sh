@@ -26,7 +26,7 @@ print_usage()
   echo "       --tidy        : Check source code with clang-tidy"
   echo "       --cppcheck    : Check source code with cppcheck"
   echo "       --noomp       : build without openMP"
-  echo "       --cup_only    : build cpu only version"
+  echo "       --cpu_only    : build cpu only version"
   echo "       -c|--compiler : Compiler: {msvc, clang, gcc}" 
   echo "";
   echo "    Examples:";

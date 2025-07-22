@@ -15,6 +15,7 @@
 #include <set>
 #include <stack>
 #include <future>
+#include <functional>
 
 namespace PMBB_NAMESPACE {
 

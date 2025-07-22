@@ -20,6 +20,8 @@ endif()
 option( USE_CPU_ONLY "CPU only, disbale GPU rendering and display mode"   OFF ) 
 OPTION( USE_OPENMP   "Use OpenMP library if available"                    ON )
 
+
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -31,6 +33,8 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
     set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG}   /MDd")
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  /NODEFAULTLIB:LIBCMT")
+elseif(APPLE)
+  add_definitions(-DOS_MACOS)
 endif()
 
 ## Open Multi-Processing (OpenMP)

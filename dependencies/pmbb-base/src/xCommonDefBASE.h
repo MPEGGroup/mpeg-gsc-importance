@@ -47,6 +47,9 @@
 #elif defined(__linux__)
   #define X_PMBB_OPERATING_SYSTEM_LINUX 1
   #define X_PMBB_OPERATING_SYSTEM_NAME "Linux"
+#elif defined(__APPLE__)
+  #define X_PMBB_OPERATING_SYSTEM_MACOS 1
+  #define X_PMBB_OPERATING_SYSTEM_NAME "macOS"
 #else
   #error "Unknown target operating system"
   #define X_PMBB_OPERATING_SYSTEM_NAME "  "
