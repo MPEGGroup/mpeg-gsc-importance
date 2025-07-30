@@ -81,12 +81,12 @@ struct Results {
   double yuvIvSsim_ = 0.0;
 
   // Weighted Averages
-  double psnrRgbAvg_    = 0.0;  // weight 1:1:1
-  double psnrYuvWavg_   = 0.0;  // weight 6:1:1
-  double psnrRgbOmAvg_  = 0.0;  // weight 1:1:1
-  double psnrYuvOmWavg_ = 0.0;  // weight 6:1:1
-  double ssimAvg_       = 0.0;  // weight 4:1:1
-  double ssimOmAvg_     = 0.0;  // weight 4:1:1
+  double psnrRgbAvg_   = 0.0;  // weight 1:1:1
+  double psnrYuvAvg_   = 0.0;  // weight 6:1:1
+  double psnrRgbOmAvg_ = 0.0;  // weight 1:1:1
+  double psnrYuvOmAvg_ = 0.0;  // weight 6:1:1
+  double ssimAvg_      = 0.0;  // weight 4:1:1
+  double ssimOmAvg_    = 0.0;  // weight 4:1:1
 
   Results& operator+=( const Results& other ) {
     // RGB / YUV MSE and PSNR
@@ -106,9 +106,9 @@ struct Results {
     ssimOm_ += other.ssimOm_;
     // Weighted Averages
     psnrRgbAvg_ += other.psnrRgbAvg_;
-    psnrYuvWavg_ += other.psnrYuvWavg_;
+    psnrYuvAvg_ += other.psnrYuvAvg_;
     psnrRgbOmAvg_ += other.psnrRgbOmAvg_;
-    psnrYuvOmWavg_ += other.psnrYuvOmWavg_;
+    psnrYuvOmAvg_ += other.psnrYuvOmAvg_;
     ssimAvg_ += other.ssimAvg_;
     ssimOmAvg_ += other.ssimOmAvg_;
     // IV SSIM
@@ -140,9 +140,9 @@ struct Results {
     yuvIvSsim_ /= divisor;
     // Weighted Averages
     psnrRgbAvg_ /= divisor;
-    psnrYuvWavg_ /= divisor;
+    psnrYuvAvg_ /= divisor;
     psnrRgbOmAvg_ /= divisor;
-    psnrYuvOmWavg_ /= divisor;
+    psnrYuvOmAvg_ /= divisor;
     return *this;
   }
 
@@ -159,26 +159,26 @@ struct Results {
   void writeMetrics( std::ostream& os, const std::string& name = "" ) const {
     os << std::fixed << std::setprecision( 8 );
     os << "Metric " << ( name.empty() ? "" : name ) << ":\n"
-       << "Mse RGB            = " << mseRgb_ << "\n"
-       << "Psnr RGB           = " << psnrRgb_ << "\n"
-       << "Psnr RGB (avg)     = " << std::setw( 16 ) << psnrRgbAvg_ << "\n"
-       << "Mse YUV            = " << mseYuv_ << "\n"
-       << "Psnr YUV           = " << psnrYuv_ << "\n"
-       << "Psnr YUV (wavg)    = " << std::setw( 16 ) << psnrYuvWavg_ << "\n"
-       << "OM-Mse RGB         = " << mseRgbOm_ << "\n"
-       << "OM-Psnr RGB        = " << psnrRgbOm_ << "\n"
-       << "OM-Psnr RGB (avg)  = " << std::setw( 16 ) << psnrRgbOmAvg_ << "\n"
-       << "OM-Mse YUV         = " << mseYuvOm_ << "\n"
-       << "OM-Psnr YUV        = " << psnrYuvOm_ << "\n"
-       << "OM-Psnr YUV (wavg) = " << std::setw( 16 ) << psnrYuvOmWavg_ << "\n"
-       << "SSIM               = " << ssim_ << "\n"
-       << "SSIM Avg           = " << std::setw( 16 ) << ssimAvg_ << "\n"
-       << "OM-SSIM            = " << ssimOm_ << "\n"
-       << "OM-SSIM Avg        = " << std::setw( 16 ) << ssimOmAvg_ << "\n"
-       << "IVSSIM RGB         = " << std::setw( 16 ) << rgbIvSsim_ << "\n"
-       << "IVSSIM YUV         = " << std::setw( 16 ) << yuvIvSsim_ << "\n";
+       << "Mse RGB           = " << mseRgb_ << "\n"
+       << "Psnr RGB          = " << psnrRgb_ << "\n"
+       << "Psnr RGB (avg)    = " << std::setw( 16 ) << psnrRgbAvg_ << "\n"
+       << "Mse YUV           = " << mseYuv_ << "\n"
+       << "Psnr YUV          = " << psnrYuv_ << "\n"
+       << "Psnr YUV (avg)    = " << std::setw( 16 ) << psnrYuvAvg_ << "\n"
+       << "OM-Mse RGB        = " << mseRgbOm_ << "\n"
+       << "OM-Psnr RGB       = " << psnrRgbOm_ << "\n"
+       << "OM-Psnr RGB (avg) = " << std::setw( 16 ) << psnrRgbOmAvg_ << "\n"
+       << "OM-Mse YUV        = " << mseYuvOm_ << "\n"
+       << "OM-Psnr YUV       = " << psnrYuvOm_ << "\n"
+       << "OM-Psnr YUV (avg) = " << std::setw( 16 ) << psnrYuvOmAvg_ << "\n"
+       << "SSIM              = " << ssim_ << "\n"
+       << "SSIM (avg)        = " << std::setw( 16 ) << ssimAvg_ << "\n"
+       << "OM-SSIM           = " << ssimOm_ << "\n"
+       << "OM-SSIM (avg)     = " << std::setw( 16 ) << ssimOmAvg_ << "\n"
+       << "IVSSIM RGB        = " << std::setw( 16 ) << rgbIvSsim_ << "\n"
+       << "IVSSIM YUV        = " << std::setw( 16 ) << yuvIvSsim_ << "\n";
     os << std::fixed << std::setprecision( 2 );
-    os << "Occupancy          = " << std::setw( 16 ) << occupancyRate_ << "%\n";
+    os << "Occupancy         = " << std::setw( 16 ) << occupancyRate_ << "%\n";
   }
 };
 

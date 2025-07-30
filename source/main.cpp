@@ -317,8 +317,9 @@ int main( int32_t argc, char* argv[] ) {
   if ( !params.useFloat_ && params.save_ ) {
     auto srcName = getOuputName( getBasename( params.sourcePath_ ) );
     auto decName = getOuputName( getBasename( params.decodePath_ ) );
-    auto suffix  = getOuputName( params.decodePath_ ) +
-                  ( params.compareCpuGpu_ ? "_cpu_vs_gpu" : ( params.useCPU_ ? "_cpu" : "_gpu" ) );
+    auto suffix =
+        ( params.outputPath_.empty() ? getOuputName( params.decodePath_ ) : getRemoveExtension( params.outputPath_ ) ) +
+        ( params.compareCpuGpu_ ? "_cpu_vs_gpu" : ( params.useCPU_ ? "_cpu" : "_gpu" ) );
 
     // Creation of butterfly and difference videos
     auto videoImgBty = Video<uint8_t>( videoImg[0], videoImg[1], true );

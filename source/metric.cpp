@@ -155,17 +155,17 @@ void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, cons
             ( mseRgbOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseRgbOmAvg ) ) : 999.99;
 
         // Compute YUV combined channel OM-PSNR (6:1:1)
-        double mseYuvOmWavg = ( 6.0 * res.mseYuvOm_.x + res.mseYuvOm_.y + res.mseYuvOm_.z ) / 8.0;
-        res.psnrYuvOmWavg_ =
-            ( mseYuvOmWavg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvOmWavg ) ) : 999.99;
+        double mseYuvOmAvg = ( 6.0 * res.mseYuvOm_.x + res.mseYuvOm_.y + res.mseYuvOm_.z ) / 8.0;
+        res.psnrYuvOmAvg_ =
+            ( mseYuvOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvOmAvg ) ) : 999.99;
       } else {
         // Handle case with no valid pixels
-        res.mseRgbOm_      = glm::dvec3( 0.0 );
-        res.psnrRgbOm_     = glm::dvec3( 999.99 );
-        res.mseYuvOm_      = glm::dvec3( 0.0 );
-        res.psnrYuvOm_     = glm::dvec3( 999.99 );
-        res.psnrRgbOmAvg_  = 999.99;
-        res.psnrYuvOmWavg_ = 999.99;
+        res.mseRgbOm_     = glm::dvec3( 0.0 );
+        res.psnrRgbOm_    = glm::dvec3( 999.99 );
+        res.mseYuvOm_     = glm::dvec3( 0.0 );
+        res.psnrYuvOm_    = glm::dvec3( 999.99 );
+        res.psnrRgbOmAvg_ = 999.99;
+        res.psnrYuvOmAvg_ = 999.99;
       }
     }
 
@@ -189,9 +189,8 @@ void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, cons
     res.psnrRgbAvg_ = ( mseRgbAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseRgbAvg ) ) : 999.99;
 
     // Compute YUV combined channel PSNR (6:1:1)
-    double mseYuvWavg = ( 6.0 * res.mseYuv_.x + res.mseYuv_.y + res.mseYuv_.z ) / 8.0;
-    res.psnrYuvWavg_ =
-        ( mseYuvWavg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvWavg ) ) : 999.99;
+    double mseYuvAvg = ( 6.0 * res.mseYuv_.x + res.mseYuv_.y + res.mseYuv_.z ) / 8.0;
+    res.psnrYuvAvg_ = ( mseYuvAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvAvg ) ) : 999.99;
 
     // Compute SSIM metrics (if needed)
     if ( computeSsimMetrics_ ) {
