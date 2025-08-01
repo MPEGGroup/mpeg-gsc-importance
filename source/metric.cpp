@@ -239,6 +239,9 @@ void convertBuffer( PMBB::xPicP& Dst, const Image<T, N>& Src ) {
   }
 }
 
+template <typename>
+inline constexpr bool always_false_v = false;
+
 template <typename T, int32_t N>
 void Metric::computeIVSSIM( Results& Result, const Image<T, N>& imageA, const Image<T, N>& imageB ) {
   using namespace PMBB;
@@ -254,7 +257,7 @@ void Metric::computeIVSSIM( Results& Result, const Image<T, N>& imageA, const Im
   } else if constexpr ( std::is_same_v<T, float> ) {
     bitDepth = 16;
   } else {
-    static_assert( false, "Unsupported Image<T, N> type" );
+    static_assert( always_false_v<T>, "Unsupported Image<T, N> type" );
   }
 
   static_assert( N == 3, "Unsupported number of components" );
