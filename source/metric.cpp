@@ -79,8 +79,12 @@ std::vector<std::vector<double>> generate_gaussian_window( int window_size, doub
 
 // Implementation of compute function with mask
 template <typename T, int32_t N>
-void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const Image<uint8_t, 1>& mask ) {
+void Metric::compute( const Image<T, N>&       imageA,
+                      const Image<T, N>&       imageB,
+                      const Image<uint8_t, 1>& mask,
+                      const int32_t            frameIndex ) {
   Results res;
+  res.frameIndex_ = frameIndex;
   if ( imageA.size() != imageB.size() || imageA.size() != mask.size() ) {
     printf( "Error: Images or mask are not the same size\n" );
     return;
@@ -243,7 +247,7 @@ template <typename>
 inline constexpr bool always_false_v = false;
 
 template <typename T, int32_t N>
-void Metric::computeIVSSIM( Results& Result, const Image<T, N>& imageA, const Image<T, N>& imageB ) {
+void Metric::computeIVSSIM( Results& result, const Image<T, N>& imageA, const Image<T, N>& imageB ) {
   using namespace PMBB;
 
   const int32 width  = imageA.width();
@@ -323,8 +327,8 @@ void Metric::computeIVSSIM( Results& Result, const Image<T, N>& imageA, const Im
   double ycbcrIvSsim = procIvSsim.calcPicIVSSIM( &picA, &picB );
 
   // store results
-  Result.rgbIvSsim_ = rgbIvSsim;
-  Result.yuvIvSsim_ = ycbcrIvSsim;
+  result.rgbIvSsim_ = rgbIvSsim;
+  result.yuvIvSsim_ = ycbcrIvSsim;
 
   // cleanup
   procIvSsim.destroy();
@@ -595,19 +599,17 @@ double Metric::computeMaskedSSIM( const Plane<double>&  img1,
       }
     }
   }
-
   return ( valid_windows > 0 ) ? ssim_total / valid_windows : 1.0;
 }
 
 // Preserve original maskless version
 template <typename T, int32_t N>
-void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB ) {
+void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const int32_t frameIndex ) {
   // Create all-valid mask
   Image<uint8_t, 1> emptyMask;
   emptyMask.resize( imageA.width(), imageA.height() );
   emptyMask.fill( 255 );  // All pixels valid
-
-  compute( imageA, imageB, emptyMask );
+  compute( imageA, imageB, emptyMask, frameIndex );
 }
 
 Results Metric::getAverage() {
@@ -617,15 +619,34 @@ Results Metric::getAverage() {
   return res;
 }
 
+Results Metric::getLastFrame() {
+  Results res;
+  if ( results_.size() == 0 ) return res;
+  int32_t frameIndex = results_.back().frameIndex_;
+  int32_t numFrames  = 0;
+  for ( auto& el : results_ )
+    if ( el.frameIndex_ == frameIndex ) {
+      res += el;
+      numFrames++;
+    }
+  res /= numFrames;
+  return res;
+}
+
 // Explicit instantiations
 template void Metric::compute<uint8_t, 3>( const Image<uint8_t, 3>&,
                                            const Image<uint8_t, 3>&,
-                                           const Image<uint8_t, 1>& );
+                                           const Image<uint8_t, 1>&,
+                                           const int32_t );
 template void Metric::compute<uint16_t, 3>( const Image<uint16_t, 3>&,
                                             const Image<uint16_t, 3>&,
-                                            const Image<uint8_t, 1>& );
-template void Metric::compute<float, 3>( const Image<float, 3>&, const Image<float, 3>&, const Image<uint8_t, 1>& );
+                                            const Image<uint8_t, 1>&,
+                                            const int32_t );
+template void Metric::compute<float, 3>( const Image<float, 3>&,
+                                         const Image<float, 3>&,
+                                         const Image<uint8_t, 1>&,
+                                         const int32_t );
 
-template void Metric::compute<uint8_t>( const Image<uint8_t>&, const Image<uint8_t>& );
-template void Metric::compute<uint16_t>( const Image<uint16_t>&, const Image<uint16_t>& );
-template void Metric::compute<float>( const Image<float>&, const Image<float>& );
+template void Metric::compute<uint8_t>( const Image<uint8_t>&, const Image<uint8_t>&, const int32_t );
+template void Metric::compute<uint16_t>( const Image<uint16_t>&, const Image<uint16_t>&, const int32_t );
+template void Metric::compute<float>( const Image<float>&, const Image<float>&, const int32_t );

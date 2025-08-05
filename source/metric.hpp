@@ -57,6 +57,9 @@ template <typename T, int32_t N>
 class Image;
 
 struct Results {
+  // Frame
+  int32_t frameIndex_ = -1;
+
   // RGB / YUV MSE and PSNR
   glm::dvec3 mseRgb_  = { 0.0, 0.0, 0.0 };
   glm::dvec3 psnrRgb_ = { 0.0, 0.0, 0.0 };
@@ -195,13 +198,17 @@ class Metric {
 
   // Compute the image quality metrics with mask
   template <typename T, int32_t N>
-  void compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const Image<uint8_t, 1>& mask );
+  void compute( const Image<T, N>&       imageA,
+                const Image<T, N>&       imageB,
+                const Image<uint8_t, 1>& mask,
+                const int32_t            frameIndex );
 
   // Compute the image quality metrics without a mask
   template <typename T, int32_t N>
-  void compute( const Image<T, N>& imageA, const Image<T, N>& imageB );
+  void compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const int32_t frameIndex );
 
   Results getAverage();
+  Results getLastFrame();
 
  private:
   inline bool isValidPixel( const glm::dvec3& pixel ) const {

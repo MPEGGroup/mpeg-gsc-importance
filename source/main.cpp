@@ -156,9 +156,6 @@ int main( int32_t argc, char* argv[] ) {
   if ( params.parse( argc, argv ) ) { return 1; }
   auto start = std::chrono::high_resolution_clock::now();
 
-  Viewpoints viewpoints;
-  if ( !params.viewpointPath_.empty() ) { viewpoints.read( params.viewpointPath_ ); }
-
   Video<uint8_t, 1> videoOcm[2];
   Video<uint8_t, 3> videoImg[2];
   Metric            metric;
@@ -176,6 +173,8 @@ int main( int32_t argc, char* argv[] ) {
       for ( int32_t i = 0; i < 2; i++ ) pc[i].trace();
 
     // Create viewpoint list
+    Viewpoints viewpoints;
+    if ( !params.viewpointPath_.empty() ) { viewpoints.read( params.viewpointPath_ ); }
     if ( viewpoints.size() == 0 ) {
       if ( params.useCameraPosition_ ) {
         auto& cameraPosition0 = pc[0].getCameraPosition();
@@ -188,12 +187,17 @@ int main( int32_t argc, char* argv[] ) {
         if ( cameraPosition1.size() == 0 ) cameraPosition1 = cameraPosition0;
         if ( cameraPosition0 != cameraPosition1 ) {
           printf( "Error: camera position of the two ply files are not equals\n" );
+          printf( "cameraPosition0: \n" );
+          for ( auto& el : cameraPosition0 ) el.log();
+          printf( "cameraPosition1: \n" );
+          for ( auto& el : cameraPosition1 ) el.log();
+          fflush( stdout );
           return 1;
         }
         viewpoints.resize( cameraPosition0.size() );
         for ( size_t i = 0; i < cameraPosition0.size(); i++ ) {
           const auto& el = cameraPosition0[i];
-          viewpoints[i].set( el.pos(), el.view(), el.up() );
+          viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_ );
           if ( params.verbose_ ) el.log();
         }
         params.numPoints_ = viewpoints.size();
@@ -294,11 +298,14 @@ int main( int32_t argc, char* argv[] ) {
         // Metric
         timer.tic( "Metric" );
         if ( params.useFloat_ )
-          metric.compute( imageFloat[0], imageFloat[1], imageOcmUnion );
+          metric.compute( imageFloat[0], imageFloat[1], imageOcmUnion, frameIndex );
         else
-          metric.compute( imageUint8[0], imageUint8[1], imageOcmUnion );
+          metric.compute( imageUint8[0], imageUint8[1], imageOcmUnion, frameIndex );
         timer.toc( "Metric", params.verbose_ );
       }
+    }
+    if ( params.verbose_ ) {
+      metric.getLastFrame().log( getBasename( params.decodePath_ ) + " frame " + std::to_string( frameIndex ) );
     }
   }
 

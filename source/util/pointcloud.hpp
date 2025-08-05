@@ -136,10 +136,8 @@ class Pointcloud {
     }
     std::string   line, s1, s2;
     std::ifstream inputPly;
-    printf( "Pointcloud reader: Reading %s \n", filename.c_str() );
-    fflush( stdout );
     if ( verbose ) {
-      printf( "Pointcloud reader: Reading  %s \n", filename.c_str() );
+      printf( "Pointcloud reader: Reading %s \n", filename.c_str() );
       fflush( stdout );
     }
     inputPly.open( filename.c_str(), std::ios::in | std::ios::binary );

@@ -169,9 +169,8 @@ void RasterizerHardware::render( const Pointcloud&  pc,
 
   // Camera
   glm::vec3 eye, center, up;
-  auto      cameraPosition = pc.getCameraPosition();
-  float     focal          = cameraPosition.size() > 0 ? cameraPosition[0].focal_[0] : 2000.f;
-  float     fov            = 2 * atan( 1.0f / ( 2 * focal / image.height() ) );
+  auto      focal = viewpoint.focal();
+  float     fov   = 2 * atan( 1.0f / ( 2 * focal[0] / image.height() ) );
   Camera    camera;
   camera.create( 10.f, fov );
   camera.initialize( image.width(), image.height() );

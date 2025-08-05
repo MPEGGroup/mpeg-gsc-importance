@@ -124,13 +124,12 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
                                  const Viewpoint&   viewpoint,
                                  Image<T, N>&       image,
                                  Image<uint8_t, 1>& ocm ) {
-  int     width          = image.width();
-  int     height         = image.height();
-  int32_t numPoints      = pc.size();
-  int32_t count          = 0;
-  auto    cameraPosition = pc.getCameraPosition();
-  float   focal          = cameraPosition.size() > 0 ? cameraPosition[0].focal_[0] : 2000.f;
-  float   fov            = 2 * atan( 1.0f / ( 2 * focal / image.height() ) );
+  int     width     = image.width();
+  int     height    = image.height();
+  int32_t numPoints = pc.size();
+  int32_t count     = 0;
+  auto    focal     = viewpoint.focal();
+  float   fov       = 2 * atan( 1.0f / ( 2 * focal[0] / image.height() ) );
   Camera  camera;
   camera.create( 10.f, fov );
   camera.initialize( image.width(), image.height() );
