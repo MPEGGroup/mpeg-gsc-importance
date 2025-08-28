@@ -321,7 +321,7 @@ class Pointcloud {
         dst.sh_[0][0] = pSh[0];
         dst.sh_[0][1] = pSh[1];
         dst.sh_[0][2] = pSh[2];
-        for ( size_t sh_idx = 1; sh_idx < 15; ++sh_idx ) {
+        for ( size_t sh_idx = 1; sh_idx < 16; ++sh_idx ) {
           dst.sh_[sh_idx][0] = pSh[3 + sh_idx - 1];
           dst.sh_[sh_idx][1] = pSh[3 + sh_idx + 14];
           dst.sh_[sh_idx][2] = pSh[3 + sh_idx + 29];
@@ -409,13 +409,13 @@ class Pointcloud {
   std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar, bool inverse = false ) const {
     int32_t               numPoints = size();
     int32_t               count     = 0;
-    std::vector<uint32_t> depth( numPoints );
+    std::vector<float>    depth( numPoints );
     std::vector<uint32_t> index( numPoints );
     const uint32_t        maxValue = std::numeric_limits<uint32_t>::max();
     for ( int32_t i = 0; i < numPoints; ++i ) {
       glm::vec4 p = modelViewProj * gaussianData_[i].xyz_;
-      if ( abs( p.x / p.w ) < 1.2 && abs( p.y / p.w ) < 1.2 && p.z > nearFar.x && p.z < nearFar.y ) {
-        depth[count] = uint32_t( maxValue * ( p.z - nearFar.x ) / ( nearFar.y - nearFar.x ) );
+      if ( p.z > nearFar.x && p.z < nearFar.y ) {
+        depth[count] = p.z;
         index[count] = i;
         count++;
       }

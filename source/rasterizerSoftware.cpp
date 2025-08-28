@@ -72,7 +72,8 @@ glm::vec4 computeRadiance( const glm::vec4 sh[16], const glm::vec3 direction, fl
            + C[11] * v.x * ( 4.0f * zz - xx - yy ) * sh[13].xyz()                  //
            + C[12] * v.z * ( xx - yy ) * sh[14].xyz()                              //
            + C[13] * v.x * ( xx - 3.0f * yy ) * sh[15].xyz();                      //
-  color += 0.5f;                                                                   //
+  color += 0.5f;
+  color = glm::max( color, 0.0f );
   return glm::vec4( color, opacity );
 }
 
@@ -91,31 +92,35 @@ glm::mat3 computeCovariance3D( glm::quat quat, glm::vec4 scale ) {
   return M * glm::transpose( M );
 }
 
-glm::mat2 computeCovariance2D( glm::vec3 mean,
-                               glm::mat3 covar,
-                               glm::mat3 viewMat,
-                               glm::mat3 projMat,
-                               glm::vec2 window ) {
-  glm::mat3   covarC = viewMat * covar * transpose( viewMat );
-  glm::vec2   c      = 0.5f * window.xy();
-  glm::vec2   f      = glm::vec2( projMat[0][0], projMat[1][1] ) * c;
-  glm::vec2   tanFov = glm::vec2( c.x / projMat[0][0], c.y / f.y );
-  glm::vec2   minXY  = ( c / f ) * glm::vec2( 1.3 );
-  float       tx     = mean.z * clamp( mean.x / mean.z, -minXY.x, minXY.x );
-  float       ty     = mean.z * clamp( mean.y / mean.z, -minXY.y, minXY.y );
-  float       tz2    = mean.z * mean.z;
-  glm::mat2x3 J      = glm::mat2x3( f.x / mean.z, 0.0, -f.x * mean.x / tz2, 0.0, f.y / mean.z, -f.y * mean.y / tz2 );
-  return glm::mat2( dot( J[0], covarC * J[0] ), dot( J[0], covarC * J[1] ), dot( J[1], covarC * J[0] ),
-                    dot( J[1], covarC * J[1] ) );
+glm::mat2 computeCovariance2D( glm::vec3 mean, glm::mat3 covar, glm::mat3 viewMat, glm::vec2 focal, glm::vec2 window ) {
+  glm::mat3   covarC    = viewMat * covar * transpose( viewMat );
+  float       cx        = window.x * 0.5f;
+  float       cy        = window.y * 0.5f;
+  float       tan_fovx  = 0.5f * window.x / focal.x;
+  float       tan_fovy  = 0.5f * window.y / focal.y;
+  float       lim_x_pos = ( window.x - cx ) / focal.x + 0.3f * tan_fovx;
+  float       lim_x_neg = cx / focal.x + 0.3f * tan_fovx;
+  float       lim_y_pos = ( window.y - cy ) / focal.y + 0.3f * tan_fovy;
+  float       lim_y_neg = cy / focal.y + 0.3f * tan_fovy;
+  float       rz        = 1.f / mean[2];
+  float       rz2       = rz * rz;
+  float       tx        = mean[2] * std::min( lim_x_pos, std::max( -lim_x_neg, mean[0] * rz ) );
+  float       ty        = mean[2] * std::min( lim_y_pos, std::max( -lim_y_neg, mean[1] * rz ) );
+  glm::mat3x2 J      = glm::mat3x2( -focal.x * rz, 0.f, 0.f, -focal.y * rz, -focal.x * tx * rz2, focal.y * ty * rz2 );
+  glm::mat3   covarF = glm::mat3( covarC[0][0], -covarC[0][1], -covarC[0][2], -covarC[1][0], covarC[1][1], covarC[1][2],
+                                -covarC[2][0], covarC[2][1], covarC[2][2] );
+  glm::mat2   result = J * covarF * glm::transpose( J );
+  return result;
 }
 
 glm::vec3 computeConic( glm::mat2 covar2d, float& radius ) {
   covar2d[0][0] += 0.3;
   covar2d[1][1] += 0.3;
   float det = std::max( covar2d[0][0] * covar2d[1][1] - covar2d[0][1] * covar2d[1][0], 1e-10f );
-  float b   = ( covar2d[0][0] + covar2d[1][1] ) * 0.5;
-  float v1  = b + sqrt( std::max( b * b - det, 0.01f ) );
-  radius    = int( ceil( 3.0 * sqrt( v1 ) ) );
+  float b   = 0.5f * ( covar2d[0][0] + covar2d[1][1] );
+  float v1  = b + sqrt( std::max( b * b - det, 0.1f ) );
+  float v2  = b - sqrt( std::max( b * b - det, 0.1f ) );
+  radius    = int( ceil( 3.0 * sqrt( std::max( v1, v2 ) ) ) );
   return glm::vec3( covar2d[1][1] / det, -( covar2d[0][1] + covar2d[1][0] ) / ( 2.0 * det ), covar2d[0][0] / det );
 }
 
@@ -129,7 +134,7 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
   int32_t numPoints = pc.size();
   int32_t count     = 0;
   auto    focal     = viewpoint.focal();
-  float   fov       = 2 * atan( 1.0f / ( 2 * focal[0] / image.height() ) );
+  float   fov       = 2 * atan( 1.0f / ( 2 * focal[1] / image.height() ) );
   Camera  camera;
   camera.create( 10.f, fov );
   camera.initialize( image.width(), image.height() );
@@ -161,7 +166,7 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
     glm::vec4   p       = projMat * t;
     glm::vec3   ndc     = glm::vec3( p.x / p.w, p.y / p.w, p.z / p.w );
     glm::mat3   covar3d = computeCovariance3D( gs.rotate_, gs.scale_ );
-    glm::mat2   covar2d = computeCovariance2D( t.xyz(), covar3d, glm::mat3( viewMat ), glm::mat3( projMat ), window );
+    glm::mat2   covar2d = computeCovariance2D( t.xyz(), covar3d, glm::mat3( viewMat ), focal, window );
     glm::vec3   conic   = computeConic( covar2d, radius );
     glm::vec4   color   = computeRadiance( gs.sh_, gs.xyz_.xyz() - pos, gs.opacity_ );
     glm::vec2   screen  = halfWindow * ndc.xy() + halfWindow;
@@ -180,7 +185,7 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
       for ( int32_t u = minU; u <= maxU; ++u ) {
         if ( done[0].get( u, v ) == 0 ) {
           glm::vec2 d     = screen - glm::vec2( u + 0.5, v + 0.5 );
-          float     sigma = 0.5 * ( conic.x * d.x * d.x + conic.z * d.y * d.y ) + conic.y * d.x * d.y;
+          float     sigma = 0.5 * ( conic.x * d.x * d.x + conic.z * d.y * d.y ) - conic.y * d.x * d.y;
           if ( sigma < 0.0f ) continue;
           float alpha = std::min( static_cast<float>( color.w * std::exp( -sigma ) ), 0.999f );
           if ( alpha >= ( 1.0f / 255.0f ) ) {

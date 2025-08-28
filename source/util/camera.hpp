@@ -136,5 +136,5 @@ class Camera {
   float     boxSize_;
   float     ratio_;
   float     fov_     = glm::radians( 45.0f );
-  glm::vec2 nearFar_ = { 0.5f, 500.0f };
+  glm::vec2 nearFar_ = { 0.010000f, 10000000000.0f };
 };

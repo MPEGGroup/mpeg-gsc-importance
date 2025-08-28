@@ -334,23 +334,23 @@ int main( int32_t argc, char* argv[] ) {
     auto videoOcmDif = videoOcm[0] - videoOcm[1];
 
     // Add overlay
-    videoImg[0].draw( "Source", 0, 8 );
-    videoImg[0].draw( srcName, 0, 24 );
-    videoImg[1].draw( "Decode", 0, 8 );
-    videoImg[1].draw( decName, 0, 24 );
-    videoImgBty.draw( "Source", 0, 8 );
-    videoImgBty.draw( srcName, 0, 24 );
-    videoImgBty.draw( "Decode", params.width_ - 8, 8, true );
-    videoImgBty.draw( decName, params.width_ - 8, 24, true );
+    // videoImg[0].draw( "Source", 0, 8 );
+    // videoImg[0].draw( srcName, 0, 24 );
+    // videoImg[1].draw( "Decode", 0, 8 );
+    // videoImg[1].draw( decName, 0, 24 );
+    // videoImgBty.draw( "Source", 0, 8 );
+    // videoImgBty.draw( srcName, 0, 24 );
+    // videoImgBty.draw( "Decode", params.width_ - 8, 8, true );
+    // videoImgBty.draw( decName, params.width_ - 8, 24, true );
 
     // Save video
-    videoImg[0].save( suffix + "_img_src" );
-    videoImg[1].save( suffix + "_img_dec" );
-    videoOcm[0].save( suffix + "_ocm_src" );
-    videoOcm[1].save( suffix + "_ocm_dec" );
-    videoImgDif.save( suffix + "_img_dif" );
-    videoOcmDif.save( suffix + "_ocm_dif" );
-    videoImgBty.save( suffix + "_img_bty" );
+    videoImg[0].save( suffix + "_img_src", true );
+    videoImg[1].save( suffix + "_img_dec", true );
+    // videoOcm[0].save( suffix + "_ocm_src", true );
+    // videoOcm[1].save( suffix + "_ocm_dec", true );
+    // videoImgDif.save( suffix + "_img_dif", true );
+    // videoOcmDif.save( suffix + "_ocm_dif", true );
+    // videoImgBty.save( suffix + "_img_bty", true );
   }
   std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
   printf( "Total time: %.3f seconds\n", elapsed.count() );
