@@ -93,24 +93,16 @@ glm::mat3 computeCovariance3D( glm::quat quat, glm::vec4 scale ) {
 }
 
 glm::mat2 computeCovariance2D( glm::vec3 mean, glm::mat3 covar, glm::mat3 viewMat, glm::vec2 focal, glm::vec2 window ) {
-  glm::mat3   covarC    = viewMat * covar * transpose( viewMat );
-  float       cx        = window.x * 0.5f;
-  float       cy        = window.y * 0.5f;
-  float       tan_fovx  = 0.5f * window.x / focal.x;
-  float       tan_fovy  = 0.5f * window.y / focal.y;
-  float       lim_x_pos = ( window.x - cx ) / focal.x + 0.3f * tan_fovx;
-  float       lim_x_neg = cx / focal.x + 0.3f * tan_fovx;
-  float       lim_y_pos = ( window.y - cy ) / focal.y + 0.3f * tan_fovy;
-  float       lim_y_neg = cy / focal.y + 0.3f * tan_fovy;
-  float       rz        = 1.f / mean[2];
-  float       rz2       = rz * rz;
-  float       tx        = mean[2] * std::min( lim_x_pos, std::max( -lim_x_neg, mean[0] * rz ) );
-  float       ty        = mean[2] * std::min( lim_y_pos, std::max( -lim_y_neg, mean[1] * rz ) );
-  glm::mat3x2 J      = glm::mat3x2( -focal.x * rz, 0.f, 0.f, -focal.y * rz, -focal.x * tx * rz2, focal.y * ty * rz2 );
-  glm::mat3   covarF = glm::mat3( covarC[0][0], -covarC[0][1], -covarC[0][2], -covarC[1][0], covarC[1][1], covarC[1][2],
-                                -covarC[2][0], covarC[2][1], covarC[2][2] );
-  glm::mat2   result = J * covarF * glm::transpose( J );
-  return result;
+  glm::vec2   center = window * 0.5f;
+  glm::vec2   limit  = 1.3f * center / focal;
+  float       rz     = 1.0f / mean.z;
+  float       rz2    = rz * rz;
+  glm::vec2   t      = mean.z * clamp( mean.xy * rz, -limit, limit );
+  glm::mat3x2 J      = glm::mat3x2( -focal.x * rz, 0.0, 0.0, -focal.y * rz, -focal.x * t.x * rz2, focal.y * t.y * rz2 );
+  glm::mat3   cov    = viewMat * covar * glm::transpose( viewMat );
+  cov = glm::mat3( cov[0][0], -cov[0][1], -cov[0][2], -cov[1][0], cov[1][1], cov[1][2], -cov[2][0], cov[2][1],
+                   cov[2][2] );
+  return J * cov * transpose( J );
 }
 
 glm::vec3 computeConic( glm::mat2 covar2d, float& radius ) {
@@ -118,9 +110,8 @@ glm::vec3 computeConic( glm::mat2 covar2d, float& radius ) {
   covar2d[1][1] += 0.3;
   float det = std::max( covar2d[0][0] * covar2d[1][1] - covar2d[0][1] * covar2d[1][0], 1e-10f );
   float b   = 0.5f * ( covar2d[0][0] + covar2d[1][1] );
-  float v1  = b + sqrt( std::max( b * b - det, 0.1f ) );
-  float v2  = b - sqrt( std::max( b * b - det, 0.1f ) );
-  radius    = int( ceil( 3.0 * sqrt( std::max( v1, v2 ) ) ) );
+  float s   = sqrt( std::max( b * b - det, 0.1f ) );
+  radius    = ceil( 3.0 * sqrt( std::max( b - s, b + s ) ) );
   return glm::vec3( covar2d[1][1] / det, -( covar2d[0][1] + covar2d[1][0] ) / ( 2.0 * det ), covar2d[0][0] / det );
 }
 

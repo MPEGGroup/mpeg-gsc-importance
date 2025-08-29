@@ -170,7 +170,7 @@ void RasterizerHardware::render( const Pointcloud&  pc,
   // Camera
   glm::vec3 eye, center, up;
   auto      focal = viewpoint.focal();
-  float     fov   = 2 * atan( 1.0f / ( 2 * focal[0] / image.height() ) );
+  float     fov   = 2 * atan( 1.0f / ( 2 * focal[1] / image.height() ) );
   Camera    camera;
   camera.create( 10.f, fov );
   camera.initialize( image.width(), image.height() );
@@ -206,6 +206,7 @@ void RasterizerHardware::render( const Pointcloud&  pc,
   program_.setUniform( "viewMat", viewMat );
   program_.setUniform( "projMat", projMat );
   program_.setUniform( "eye", pos );
+  program_.setUniform( "focal", focal );
   program_.setUniform( "window", glm::vec4( width_, height_, nearFar ) );
   GLubyte zero = 0;
   glClearTexImage( ocm_, 0, GL_RED, GL_UNSIGNED_BYTE, &zero );

@@ -157,6 +157,7 @@ void Viewpoints::keyCallback( GLFWwindow* window, int key, int scancode, int act
           if ( instance_->viewpoints_.size() > instance_->viewpointIndex_ ) {
             auto& el = instance_->viewpoints_[instance_->viewpointIndex_];
             instance_->camera_.setLookAt( el.pos(), el.view(), el.up() );
+            instance_->focal_          = el.focal();
             instance_->viewpointIndex_ = ( instance_->viewpointIndex_ + 1 ) % instance_->viewpoints_.size();
           }
         } break;
@@ -212,8 +213,8 @@ void Viewpoints::display( const Pointcloud& pc, int width, int height ) {
   // Initialize camera
   glm::vec3 eye = glm::vec3( -15, 0, -2 ), center = glm::vec3( 0, 0.5, 0 ), up = glm::vec3( 0, -1, 0 );
   auto      cameraPosition = pc.getCameraPosition();
-  float     focal          = cameraPosition.size() > 0 ? cameraPosition[0].focal_[0] : 2000.f;
-  float     fov            = 2 * atan( 1.0f / ( 2 * focal / height ) );
+  if ( viewpoints_.size() > 0 ) focal_ = viewpoints_[0].focal();
+  float fov = 2 * atan( 1.0f / ( 2 * focal_[1] / height ) );
   camera_.create( 10.f, fov );
   camera_.initialize( width, height );
   camera_.setLookAt( eye, center, up );
@@ -289,6 +290,7 @@ void Viewpoints::display( const Pointcloud& pc, int width, int height ) {
     programPoints.setUniform( "viewMat", viewMat );
     programPoints.setUniform( "projMat", projMat );
     programPoints.setUniform( "eye", camera_.getPosition() );
+    programPoints.setUniform( "focal", focal_ );
     programPoints.setUniform( "window", glm::vec4( (float)width, (float)height, camera_.nearFar() ) );
 
     // Rendering

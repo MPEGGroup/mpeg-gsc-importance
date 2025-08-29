@@ -162,4 +162,5 @@ class Viewpoints {
   bool                        firstMouse_     = true;
   int32_t                     viewpointIndex_ = 0;
   int32_t                     cameraIndex_    = 0;
+  glm::vec2                   focal_          = glm::vec2( 2000.f, 2000.f );
 };
