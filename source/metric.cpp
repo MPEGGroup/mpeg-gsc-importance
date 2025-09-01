@@ -42,15 +42,14 @@
 #include "xSSIM.h"
 #include "xColorSpace.h"
 
-Metric::Metric() : computeOmMetrics_( true ), computeSsimMetrics_( true ) {}
+Metric::Metric( bool computeOm, bool computeSsim, bool computeIvssimMetrics, bool computeQmiv ) :
+    computeOmMetrics_( computeOm ),
+    computeSsimMetrics_( computeSsim ),
+    computeIvssimMetrics_( computeIvssimMetrics ),
+    computeQmiv_( computeQmiv ) {}
 
 Metric::~Metric() { results_.clear(); }
 
-inline glm::dvec3 rgbToYuvBt709( const glm::dvec3& rgb ) {
-  return glm::vec3( 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2],
-                    -0.1146f * rgb[0] - 0.3854f * rgb[1] + 0.5000f * rgb[2] + 128.0f,
-                    0.5000f * rgb[0] - 0.4542f * rgb[1] - 0.0458f * rgb[2] + 128.0f );
-}
 inline glm::dvec3 log10( const glm::dvec3& v ) {
   return glm::dvec3( std::log10( v.x ), std::log10( v.y ), std::log10( v.z ) );
 };
@@ -85,7 +84,7 @@ void Metric::compute( const Image<T, N>&       imageA,
                       const int32_t            frameIndex ) {
   Results res;
   res.frameIndex_ = frameIndex;
-  if ( imageA.size() != imageB.size() || imageA.size() != mask.size() ) {
+  if ( imageA.size() != imageB.size() || ( computeOmMetrics_ && imageA.size() != mask.size() ) ) {
     printf( "Error: Images or mask are not the same size\n" );
     return;
   } else {
@@ -95,6 +94,7 @@ void Metric::compute( const Image<T, N>&       imageA,
     } else if constexpr ( std::is_floating_point_v<T> ) {
       peak = 1.0;
     }
+    double     peak2  = peak * peak;
     const auto size   = imageA.size();
     const int  width  = imageA.width();
     const int  height = imageA.height();
@@ -104,100 +104,85 @@ void Metric::compute( const Image<T, N>&       imageA,
     glm::dvec3 mseRgbOm        = { 0.0, 0.0, 0.0 };
     glm::dvec3 mseYuvOm        = { 0.0, 0.0, 0.0 };
 
-    // Create YUV images
-    Plane<double> yuvA[3], yuvB[3];
-    for ( int i = 0; i < 3; i++ ) {
-      yuvA[i].resize( width, height );
-      yuvB[i].resize( width, height );
-    }
-
-    // Convert to YUV and count valid pixels
-    for ( int32_t y = 0; y < height; y++ ) {
-      for ( int32_t x = 0; x < width; x++ ) {
-        int32_t          index    = y * width + x;
-        const glm::dvec3 rgbA     = imageA.get( index );
-        const glm::dvec3 rgbB     = imageB.get( index );
-        const glm::dvec3 yuvA_val = rgbToYuvBt709( rgbA );
-        const glm::dvec3 yuvB_val = rgbToYuvBt709( rgbB );
-
-        for ( int c = 0; c < 3; c++ ) {
-          yuvA[c].set( x, y, yuvA_val[c] );
-          yuvB[c].set( x, y, yuvB_val[c] );
-        }
-
-        // Use mask or automatically detect valid pixels
-        bool isValid = ( mask.plane( 0 ).get( x, y ) != 0 );
-
-        if ( isValid ) {
-          validPixelCount++;
-
-          // Compute RGB difference
-          const glm::dvec3 rgb = rgbA - rgbB;
-          mseRgbOm += rgb * rgb;
-
-          // Compute YUV difference
-          const glm::dvec3 yuv = yuvA_val - yuvB_val;
-          mseYuvOm += yuv * yuv;
-        }
-      }
-    }
-    // Compute valid pixel ratio
-    res.occupancyRate_ = ( validPixelCount > 0 ) ? ( 100.0 * validPixelCount / size ) : 0.0;
-
-    // Compute OM-PSNR
-    if ( computeOmMetrics_ ) {
-      if ( validPixelCount > 0 ) {
-        res.mseRgbOm_  = mseRgbOm / static_cast<double>( validPixelCount );
-        res.psnrRgbOm_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / ( res.mseRgbOm_ ) ) );
-
-        res.mseYuvOm_  = mseYuvOm / static_cast<double>( validPixelCount );
-        res.psnrYuvOm_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / ( res.mseYuvOm_ ) ) );
-
-        // Compute RGB combined channel OM-PSNR (1:1:1)
-        double mseRgbOmAvg = ( res.mseRgbOm_.x + res.mseRgbOm_.y + res.mseRgbOm_.z ) / 3.0;
-        res.psnrRgbOmAvg_ =
-            ( mseRgbOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseRgbOmAvg ) ) : 999.99;
-
-        // Compute YUV combined channel OM-PSNR (6:1:1)
-        double mseYuvOmAvg = ( 6.0 * res.mseYuvOm_.x + res.mseYuvOm_.y + res.mseYuvOm_.z ) / 8.0;
-        res.psnrYuvOmAvg_ =
-            ( mseYuvOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvOmAvg ) ) : 999.99;
-      } else {
-        // Handle case with no valid pixels
-        res.mseRgbOm_     = glm::dvec3( 0.0 );
-        res.psnrRgbOm_    = glm::dvec3( 999.99 );
-        res.mseYuvOm_     = glm::dvec3( 0.0 );
-        res.psnrYuvOm_    = glm::dvec3( 999.99 );
-        res.psnrRgbOmAvg_ = 999.99;
-        res.psnrYuvOmAvg_ = 999.99;
+    // Original MSE and OM-MSE computation
+    for ( int32_t index = 0; index < size; index++ ) {
+      const glm::dvec3 rgb = imageA.get( index ) - imageB.get( index );
+      const glm::dvec3 yuv = computeQmiv_ ? imageA.getYuvQmiv( index ) - imageB.getYuvQmiv( index )
+                                          : imageA.getYuv( index ) - imageB.getYuv( index );
+      res.mseRgb_ += rgb * rgb;
+      res.mseYuv_ += yuv * yuv;
+      // Use mask to detect valid pixels
+      if ( computeOmMetrics_ && mask[0].get( index ) != 0 ) {
+        validPixelCount++;
+        mseRgbOm += rgb * rgb;
+        mseYuvOm += yuv * yuv;
       }
     }
 
-    // Original PSNR computation (full image)
-    for ( int32_t y = 0; y < height; y++ ) {
-      for ( int32_t x = 0; x < width; x++ ) {
-        int32_t          index = y * width + x;
-        const glm::dvec3 rgb   = imageA.get( index ) - imageB.get( index );
-        const glm::dvec3 yuv   = rgbToYuvBt709( imageA.get( index ) ) - rgbToYuvBt709( imageB.get( index ) );
-        res.mseRgb_ += rgb * rgb;
-        res.mseYuv_ += yuv * yuv;
-      }
-    }
+    // Computation PSNR full image
     res.mseRgb_ /= size;
     res.mseYuv_ /= size;
-    res.psnrRgb_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / res.mseRgb_ ) );
-    res.psnrYuv_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak * peak ) / res.mseYuv_ ) );
+    res.psnrRgb_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak2 ) / res.mseRgb_ ) );
+    res.psnrYuv_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak2 ) / res.mseYuv_ ) );
 
     // Compute RGB combined channel PSNR (1:1:1)
-    double mseRgbAvg = ( res.mseRgb_.x + res.mseRgb_.y + res.mseRgb_.z ) / 3.0;
-    res.psnrRgbAvg_ = ( mseRgbAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseRgbAvg ) ) : 999.99;
+    if ( computeQmiv_ ) {
+      res.psnrRgbAvg_ = ( res.psnrRgb_.x + res.psnrRgb_.y + res.psnrRgb_.z ) / 3.0;
+    } else {
+      double mseRgbAvg = ( res.mseRgb_.x + res.mseRgb_.y + res.mseRgb_.z ) / 3.0;
+      res.psnrRgbAvg_  = ( mseRgbAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak2 ) / mseRgbAvg ) ) : 999.99;
+    }
 
-    // Compute YUV combined channel PSNR (6:1:1)
-    double mseYuvAvg = ( 6.0 * res.mseYuv_.x + res.mseYuv_.y + res.mseYuv_.z ) / 8.0;
-    res.psnrYuvAvg_ = ( mseYuvAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak * peak ) / mseYuvAvg ) ) : 999.99;
+    // Compute YUV combined channel PSNR (4:1:1)
+    if ( computeQmiv_ ) {
+      res.psnrYuvAvg_ = ( 4.0 * res.psnrYuv_.x + res.psnrYuv_.y + res.psnrYuv_.z ) / 6.0;
+    } else {
+      double mseYuvAvg = ( 4.0 * res.mseYuv_.x + res.mseYuv_.y + res.mseYuv_.z ) / 6.0;
+      res.psnrYuvAvg_  = ( mseYuvAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak2 ) / mseYuvAvg ) ) : 999.99;
+    }
 
-    // Compute SSIM metrics (if needed)
+    // Compute OM-PSNR for valid pixels
+    if ( computeOmMetrics_ && validPixelCount > 0 ) {
+      // Compute RGB MSE
+      res.mseRgbOm_  = mseRgbOm / static_cast<double>( validPixelCount );
+      res.psnrRgbOm_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak2 ) / ( res.mseRgbOm_ ) ) );
+
+      // Compute YUV MSE
+      res.mseYuvOm_  = mseYuvOm / static_cast<double>( validPixelCount );
+      res.psnrYuvOm_ = glm::min( glm::dvec3( 999.99 ), 10.0 * log10( ( peak2 ) / ( res.mseYuvOm_ ) ) );
+
+      // Compute RGB combined channel OM-PSNR (1:1:1)
+      if ( computeQmiv_ ) {
+        res.psnrRgbOmAvg_ = ( res.psnrRgbOm_.x + res.psnrRgbOm_.y + res.psnrRgbOm_.z ) / 3.0;
+      } else {
+        double mseRgbOmAvg = ( res.mseRgbOm_.x + res.mseRgbOm_.y + res.mseRgbOm_.z ) / 3.0;
+        res.psnrRgbOmAvg_ =
+            ( mseRgbOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak2 ) / mseRgbOmAvg ) ) : 999.99;
+      }
+
+      // Compute YUV combined channel OM-PSNR (4:1:1)
+      if ( computeQmiv_ ) {
+        res.psnrYuvOmAvg_ = ( 4.0 * res.psnrYuvOm_.x + res.psnrYuvOm_.y + res.psnrYuvOm_.z ) / 6.0;
+      } else {
+        double mseYuvOmAvg = ( 4.0 * res.mseYuvOm_.x + res.mseYuvOm_.y + res.mseYuvOm_.z ) / 6.0;
+        res.psnrYuvOmAvg_ =
+            ( mseYuvOmAvg > 0 ) ? std::min( 999.99, 10.0 * std::log10( ( peak2 ) / mseYuvOmAvg ) ) : 999.99;
+      }
+
+      // Compute occupancy rate
+      res.occupancyRate_ = 100.0 * validPixelCount / size;
+    }
+
+    // Compute SSIM metrics
     if ( computeSsimMetrics_ ) {
+      // Create YUV images
+      Image<double, 3> yuvA( width, height );
+      Image<double, 3> yuvB( width, height );
+      for ( int32_t index = 0; index < size; index++ ) {
+        yuvA.set( index, computeQmiv_ ? imageA.getYuvQmiv( index ) : imageA.getYuv( index ) );
+        yuvB.set( index, computeQmiv_ ? imageB.getYuvQmiv( index ) : imageB.getYuv( index ) );
+      }
+
       // Compute SSIM and OM-SSIM for each channel
       for ( int c = 0; c < 3; c++ ) {
         // Standard SSIM (full image)
@@ -211,7 +196,9 @@ void Metric::compute( const Image<T, N>&       imageA,
       res.ssimAvg_ = ( 4.0 * res.ssim_[0] + res.ssim_[1] + res.ssim_[2] ) / 6.0;
       if ( computeOmMetrics_ ) { res.ssimOmAvg_ = ( 4.0 * res.ssimOm_[0] + res.ssimOm_[1] + res.ssimOm_[2] ) / 6.0; }
     }
-    computeIVSSIM( res, imageA, imageB );
+
+    // Compute IVSSIM metrics
+    if ( computeIvssimMetrics_ ) { computeIVSSIM( res, imageA, imageB ); }
   }
   results_.push_back( res );
 }
@@ -600,16 +587,6 @@ double Metric::computeMaskedSSIM( const Plane<double>&  img1,
     }
   }
   return ( valid_windows > 0 ) ? ssim_total / valid_windows : 1.0;
-}
-
-// Preserve original maskless version
-template <typename T, int32_t N>
-void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const int32_t frameIndex ) {
-  // Create all-valid mask
-  Image<uint8_t, 1> emptyMask;
-  emptyMask.resize( imageA.width(), imageA.height() );
-  emptyMask.fill( 255 );  // All pixels valid
-  compute( imageA, imageB, emptyMask, frameIndex );
 }
 
 Results Metric::getAverage() {

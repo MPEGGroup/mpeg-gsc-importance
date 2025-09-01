@@ -181,6 +181,19 @@ static std::string createFilename( const std::string& pFilename, int32_t iFrameI
   return sFilename;
 }
 
+static bool createDirectory( const std::string& eFilename ) {
+  try {
+    std::filesystem::path p( eFilename );
+    std::filesystem::path dir = p.parent_path();
+    if ( dir.empty() ) { return true; }
+    if ( !std::filesystem::exists( dir ) ) { return std::filesystem::create_directories( dir ); }
+    return true;
+  } catch ( const std::filesystem::filesystem_error& e ) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    return false;
+  }
+}
+
 static std::string getExtension( const std::string& eFilename ) {
   auto position = eFilename.find_last_of( '.' );
   if ( position != std::string::npos ) {

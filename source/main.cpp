@@ -71,6 +71,8 @@ struct Parameters {
   std::string outputPath_        = "";
   bool        computeOm_         = true;
   bool        computeSsim_       = true;
+  bool        computeIvssim_     = true;
+  bool        computeQmiv_       = true;
 
   bool parse( int32_t argc, char* argv[] ) {
     namespace po = df::program_options_lite;
@@ -104,11 +106,15 @@ struct Parameters {
         ("float",             useFloat_,          useFloat_,          "Use floatting point images")
         ("compareCpuGpu",     compareCpuGpu_,     compareCpuGpu_,     "Compare CPU/GPU rendering")
 
-      ( po::Section("Output options") )      
-        ("s,save",            save_,              save_,              "Save generated videos")
-        ("o,output",          outputPath_,        outputPath_,        "Output text file for metrics")
+      (po::Section("metrics"))  
         ("computeOm",         computeOm_,         computeOm_,         "Compute OM metrics (OM-PSNR and OM-SSIM)")
         ("computeSsim",       computeSsim_,       computeSsim_,       "Compute SSIM metrics")
+        ("computeIvssim",     computeIvssim_,     computeIvssim_,     "Compute IVSSIM metrics")
+        ("computeQmiv",       computeQmiv_,       computeQmiv_,       "Compute color transform and average as QMIV")
+        
+      ( po::Section("Output") )      
+        ("s,save",            save_,              save_,              "Save generated videos")
+        ("o,output",          outputPath_,        outputPath_,        "Output text file for metrics")
       ;
 
     /* clang-format on */
@@ -158,7 +164,7 @@ int main( int32_t argc, char* argv[] ) {
 
   Video<uint8_t, 1> videoOcm[2];
   Video<uint8_t, 3> videoImg[2];
-  Metric            metric;
+  Metric            metric( params.computeOm_, params.computeSsim_, params.computeIvssim_, params.computeQmiv_ );
   Rasterizer        rasterizer( params.useCPU_ ), rasterizerCpu( true ), rasterizerGpu( false );
   Timer             timer;
 
@@ -244,6 +250,7 @@ int main( int32_t argc, char* argv[] ) {
         auto  imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
                                                           Image<uint8_t, 1>( params.width_, params.height_ ) };
         auto& viewpoint  = viewpoints[viewpointIndex];
+        Image<uint8_t, 1> imageOcmUnion;
         if ( params.onlyViewpoint_ != -1 && viewpointIndex != params.onlyViewpoint_ ) continue;
         if ( params.verbose_ ) {
           printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
@@ -276,24 +283,27 @@ int main( int32_t argc, char* argv[] ) {
         // Save
         if ( params.save_ ) {
           uint32_t frameIndex = videoImg[0].size() - viewpoints.size() + viewpointIndex;
-          if ( params.useFloat_ )
+          if ( params.useFloat_ ) {
             for ( int32_t i = 0; i < 2; i++ ) videoImg[i][frameIndex] = imageFloat[i];
-          else
+          } else {
             for ( int32_t i = 0; i < 2; i++ ) videoImg[i][frameIndex] = imageUint8[i];
+          }
           for ( int32_t i = 0; i < 2; i++ ) videoOcm[i][frameIndex] = imageOcm[i];
         }
 
         // Compute the union of two masks (ocm_union)
-        timer.tic( "UnionMask" );
-        Image<uint8_t, 1> imageOcmUnion( params.width_, params.height_ );
-        for ( int32_t y = 0; y < params.height_; y++ ) {
-          for ( int32_t x = 0; x < params.width_; x++ ) {
-            uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
-            uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
-            imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
+        if ( params.computeOm_ ) {
+          timer.tic( "UnionMask" );
+          imageOcmUnion.resize( params.width_, params.height_ );
+          for ( int32_t y = 0; y < params.height_; y++ ) {
+            for ( int32_t x = 0; x < params.width_; x++ ) {
+              uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
+              uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
+              imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
+            }
           }
+          timer.toc( "UnionMask", params.verbose_ );
         }
-        timer.toc( "UnionMask", params.verbose_ );
 
         // Metric
         timer.tic( "Metric" );
@@ -305,13 +315,13 @@ int main( int32_t argc, char* argv[] ) {
       }
     }
     if ( params.verbose_ ) {
-      metric.getLastFrame().log( getBasename( params.decodePath_ ) + " frame " + std::to_string( frameIndex ) );
+      metric.getLastFrame().log( stringFormat( getBasename( params.decodePath_ ).c_str(), frameIndex ) );
     }
   }
 
   // Show metric results
   Results avgResults = metric.getAverage();
-  avgResults.log( getBasename( params.decodePath_ ) );
+  avgResults.log( stringFormat( "Average for %d frames", params.frameCount_ ) );
 
   // Save the results to a file
   if ( !params.outputPath_.empty() ) {

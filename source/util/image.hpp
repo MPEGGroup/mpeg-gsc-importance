@@ -65,6 +65,8 @@ struct Plane {
   inline T&             operator()( int32_t u, int32_t v ) { return buffer_[v * width_ + u]; }
   inline T              operator()( int32_t i ) const { return buffer_[i]; }
   inline T&             operator()( int32_t i ) { return buffer_[i]; }
+  inline T              operator[]( int32_t i ) const { return buffer_[i]; }
+  inline T&             operator[]( int32_t i ) { return buffer_[i]; }
   inline T*             data( int32_t u, int32_t v ) { return buffer_ + ( v * width_ + u ); }
   inline const T*       data( int32_t u, int32_t v ) const { return buffer_.data() + ( v * width_ + u ); }
   inline void           set( int32_t index, T e ) { buffer_[index] = e; }
@@ -193,9 +195,30 @@ class Image {
   glm::dvec3 get( int32_t index ) const {
     return glm::dvec3( planes_[0].get( index ), planes_[1].get( index ), planes_[2].get( index ) );
   }
+  void set( int32_t index, const glm::dvec3& e ) {
+    for ( int32_t i = 0; i < 3; i++ ) { planes_[i].set( index, e[i] ); }
+  }
+
   T get( int32_t c, int32_t u, int32_t v ) const { return planes_[c].get( u, v ); }
 
   void set( int32_t c, int32_t u, int32_t v, T e ) { planes_[c].set( u, v, e ); }
+
+  glm::dvec3 getYuv( int32_t index ) const {
+    glm::dvec3 rgb( planes_[0][index], planes_[1][index], planes_[2][index] );
+    return glm::vec3( 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2],
+                      -0.1146f * rgb[0] - 0.3854f * rgb[1] + 0.5000f * rgb[2] + 128.0f,
+                      0.5000f * rgb[0] - 0.4542f * rgb[1] - 0.0458f * rgb[2] + 128.0f );
+  }
+
+  glm::dvec3 getYuvQmiv( int32_t index ) const {
+    int32_t r = planes_[0][index];
+    int32_t g = planes_[1][index];
+    int32_t b = planes_[2][index];
+    int32_t y = std::clamp( ( ( 13933 * r + 46871 * g + 4732 * b + 32768 ) >> 16 ), 0, 255 );
+    int32_t u = std::clamp( ( ( -7509 * r - 25259 * g + ( b << 15 ) + 32768 ) >> 16 ) + 128, 0, 255 );
+    int32_t v = std::clamp( ( ( ( r << 15 ) - 29763 * g - 3005 * b + 32768 ) >> 16 ) + 128, 0, 255 );
+    return glm::dvec3( y, u, v );
+  }
 
   Image& operator*=( T scalar ) {
     for ( auto& plane : planes_ ) plane *= scalar;
@@ -464,6 +487,7 @@ class Video {
   bool save( const std::string& prefix, const bool planar = false ) const {
     auto filename = prefix + "_" + std::to_string( width_ ) + "x" + std::to_string( height_ ) + "_" +
                     std::to_string( sizeof( T ) * 8 ) + "b_" + ( planar ? "p" : "i" ) + "444" + ".rgb";
+    createDirectory( filename );
     std::ofstream file( filename, std::ios::binary );
     if ( !file.is_open() ) {
       printf( "Error: Unable to open file %s for writing.\n", filename.c_str() );

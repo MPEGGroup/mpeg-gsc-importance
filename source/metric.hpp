@@ -48,7 +48,7 @@ std::vector<std::vector<double>> generate_gaussian_window( int window_size, doub
 inline std::ostream& operator<<( std::ostream& os, const glm::dvec3& v ) {
   std::ios_base::fmtflags f( os.flags() );
   std::streamsize         p = os.precision();
-  os << std::setw( 16 ) << v.x << " " << std::setw( 16 ) << v.y << " " << std::setw( 16 ) << v.z;
+  os << std::setw( 20 ) << v.x << " " << std::setw( 20 ) << v.y << " " << std::setw( 20 ) << v.z;
   os.flags( f );
   os.precision( p );
   return os;
@@ -85,9 +85,9 @@ struct Results {
 
   // Weighted Averages
   double psnrRgbAvg_   = 0.0;  // weight 1:1:1
-  double psnrYuvAvg_   = 0.0;  // weight 6:1:1
+  double psnrYuvAvg_   = 0.0;  // weight 4:1:1
   double psnrRgbOmAvg_ = 0.0;  // weight 1:1:1
-  double psnrYuvOmAvg_ = 0.0;  // weight 6:1:1
+  double psnrYuvOmAvg_ = 0.0;  // weight 4:1:1
   double ssimAvg_      = 0.0;  // weight 4:1:1
   double ssimOmAvg_    = 0.0;  // weight 4:1:1
 
@@ -151,6 +151,7 @@ struct Results {
 
   void log( const std::string& name = "" ) const { writeMetrics( std::cout, name ); }
   void saveToFile( const std::string& filename, const std::string& name = "" ) const {
+    createDirectory( filename );
     std::ofstream file( filename, std::ios::app );
     if ( file.is_open() ) {
       writeMetrics( file, name );
@@ -160,34 +161,34 @@ struct Results {
 
  private:
   void writeMetrics( std::ostream& os, const std::string& name = "" ) const {
-    os << std::fixed << std::setprecision( 8 );
+    os << std::fixed << std::setprecision( 12 );
     os << "Metric " << ( name.empty() ? "" : name ) << ":\n"
        << "Mse RGB           = " << mseRgb_ << "\n"
        << "Psnr RGB          = " << psnrRgb_ << "\n"
-       << "Psnr RGB (avg)    = " << std::setw( 16 ) << psnrRgbAvg_ << "\n"
+       << "Psnr RGB (avg)    = " << std::setw( 20 ) << psnrRgbAvg_ << "\n"
        << "Mse YUV           = " << mseYuv_ << "\n"
        << "Psnr YUV          = " << psnrYuv_ << "\n"
-       << "Psnr YUV (avg)    = " << std::setw( 16 ) << psnrYuvAvg_ << "\n"
+       << "Psnr YUV (avg)    = " << std::setw( 20 ) << psnrYuvAvg_ << "\n"
        << "OM-Mse RGB        = " << mseRgbOm_ << "\n"
        << "OM-Psnr RGB       = " << psnrRgbOm_ << "\n"
-       << "OM-Psnr RGB (avg) = " << std::setw( 16 ) << psnrRgbOmAvg_ << "\n"
+       << "OM-Psnr RGB (avg) = " << std::setw( 20 ) << psnrRgbOmAvg_ << "\n"
        << "OM-Mse YUV        = " << mseYuvOm_ << "\n"
        << "OM-Psnr YUV       = " << psnrYuvOm_ << "\n"
-       << "OM-Psnr YUV (avg) = " << std::setw( 16 ) << psnrYuvOmAvg_ << "\n"
+       << "OM-Psnr YUV (avg) = " << std::setw( 20 ) << psnrYuvOmAvg_ << "\n"
        << "SSIM              = " << ssim_ << "\n"
-       << "SSIM (avg)        = " << std::setw( 16 ) << ssimAvg_ << "\n"
+       << "SSIM (avg)        = " << std::setw( 20 ) << ssimAvg_ << "\n"
        << "OM-SSIM           = " << ssimOm_ << "\n"
-       << "OM-SSIM (avg)     = " << std::setw( 16 ) << ssimOmAvg_ << "\n"
-       << "IVSSIM RGB        = " << std::setw( 16 ) << rgbIvSsim_ << "\n"
-       << "IVSSIM YUV        = " << std::setw( 16 ) << yuvIvSsim_ << "\n";
+       << "OM-SSIM (avg)     = " << std::setw( 20 ) << ssimOmAvg_ << "\n"
+       << "IVSSIM RGB        = " << std::setw( 20 ) << rgbIvSsim_ << "\n"
+       << "IVSSIM YUV        = " << std::setw( 20 ) << yuvIvSsim_ << "\n";
     os << std::fixed << std::setprecision( 2 );
-    os << "Occupancy         = " << std::setw( 16 ) << occupancyRate_ << "%\n";
+    os << "Occupancy         = " << std::setw( 20 ) << occupancyRate_ << "%\n";
   }
 };
 
 class Metric {
  public:
-  Metric();
+  Metric( bool computeOm_ = true, bool computeSsim_ = true, bool computeIvssimMetrics = true, bool computeQmiv = true );
   ~Metric();
 
   void reset() { results_.clear(); }
@@ -229,6 +230,8 @@ class Metric {
   mutable int                              window_size_    = 11;
   mutable double                           gaussian_sigma_ = 1.5;
   std::vector<Results>                     results_;
-  bool                                     computeOmMetrics_   = true;
-  bool                                     computeSsimMetrics_ = true;
+  bool                                     computeOmMetrics_     = true;
+  bool                                     computeSsimMetrics_   = true;
+  bool                                     computeIvssimMetrics_ = true;
+  bool                                     computeQmiv_          = true;
 };
