@@ -97,7 +97,7 @@ glm::mat2 computeCovariance2D( glm::vec3 mean, glm::mat3 covar, glm::mat3 viewMa
   glm::vec2   limit  = 1.3f * center / focal;
   float       rz     = 1.0f / mean.z;
   float       rz2    = rz * rz;
-  glm::vec2   t      = mean.z * clamp( mean.xy * rz, -limit, limit );
+  glm::vec2   t      = mean.z * clamp( mean.xy() * rz, -limit, limit );
   glm::mat3x2 J      = glm::mat3x2( -focal.x * rz, 0.0, 0.0, -focal.y * rz, -focal.x * t.x * rz2, focal.y * t.y * rz2 );
   glm::mat3   cov    = viewMat * covar * glm::transpose( viewMat );
   cov = glm::mat3( cov[0][0], -cov[0][1], -cov[0][2], -cov[1][0], cov[1][1], cov[1][2], -cov[2][0], cov[2][1],

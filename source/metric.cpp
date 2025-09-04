@@ -76,6 +76,13 @@ std::vector<std::vector<double>> generateGaussianWindow( int windowSize, double 
   return window;
 }
 
+// Preserve original maskless version
+template <typename T, int32_t N>
+void Metric::compute( const Image<T, N>& imageA, const Image<T, N>& imageB, const int32_t frameIndex ) {
+  Image<uint8_t, 1> emptyMask( imageA.width(), imageA.height(), 1 );
+  compute( imageA, imageB, emptyMask, frameIndex );
+}
+
 // Implementation of compute function with mask
 template <typename T, int32_t N>
 void Metric::compute( const Image<T, N>&       imageA,
@@ -611,6 +618,6 @@ template void Metric::compute<float, 3>( const Image<float, 3>&,
                                          const Image<uint8_t, 1>&,
                                          const int32_t );
 
-template void Metric::compute<uint8_t>( const Image<uint8_t>&, const Image<uint8_t>&, const int32_t );
-template void Metric::compute<uint16_t>( const Image<uint16_t>&, const Image<uint16_t>&, const int32_t );
-template void Metric::compute<float>( const Image<float>&, const Image<float>&, const int32_t );
+template void Metric::compute<uint8_t, 3>( const Image<uint8_t, 3>&, const Image<uint8_t, 3>&, const int32_t );
+template void Metric::compute<uint16_t, 3>( const Image<uint16_t, 3>&, const Image<uint16_t, 3>&, const int32_t );
+template void Metric::compute<float, 3>( const Image<float, 3>&, const Image<float, 3>&, const int32_t );
