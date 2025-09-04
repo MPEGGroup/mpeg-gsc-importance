@@ -72,7 +72,7 @@ struct Parameters {
   bool        computeOm_         = true;
   bool        computeSsim_       = true;
   bool        computeIvssim_     = true;
-  bool        computeQmiv_       = true;
+  bool        computeQmiv_       = false;
 
   bool parse( int32_t argc, char* argv[] ) {
     namespace po = df::program_options_lite;
@@ -299,7 +299,7 @@ int main( int32_t argc, char* argv[] ) {
             for ( int32_t x = 0; x < params.width_; x++ ) {
               uint8_t val0 = imageOcm[0].plane( 0 ).get( x, y );
               uint8_t val1 = imageOcm[1].plane( 0 ).get( x, y );
-              imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 255 : 0 );
+              imageOcmUnion.plane( 0 ).set( x, y, ( val0 || val1 ) ? 1 : 0 );
             }
           }
           timer.toc( "UnionMask", params.verbose_ );

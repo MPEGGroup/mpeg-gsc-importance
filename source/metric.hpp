@@ -83,13 +83,13 @@ struct Results {
   double rgbIvSsim_ = 0.0;
   double yuvIvSsim_ = 0.0;
 
-  // Weighted Averages
-  double psnrRgbAvg_   = 0.0;  // weight 1:1:1
-  double psnrYuvAvg_   = 0.0;  // weight 4:1:1
-  double psnrRgbOmAvg_ = 0.0;  // weight 1:1:1
-  double psnrYuvOmAvg_ = 0.0;  // weight 4:1:1
-  double ssimAvg_      = 0.0;  // weight 4:1:1
-  double ssimOmAvg_    = 0.0;  // weight 4:1:1
+  // Weighted Averages:
+  double psnrRgbAvg_   = 0.0;  // weight MPEG = 1:1:1 QMIV = 1:1:1
+  double psnrYuvAvg_   = 0.0;  // weight MPEG = 1:1:1 QMIV = 4:1:1
+  double psnrRgbOmAvg_ = 0.0;  // weight MPEG = 1:1:1 QMIV = 1:1:1
+  double psnrYuvOmAvg_ = 0.0;  // weight MPEG = 1:1:1 QMIV = 4:1:1
+  double ssimAvg_      = 0.0;  // weight MPEG = 1:1:1 QMIV = 4:1:1
+  double ssimOmAvg_    = 0.0;  // weight MPEG = 1:1:1 QMIV = 4:1:1
 
   Results& operator+=( const Results& other ) {
     // RGB / YUV MSE and PSNR
@@ -226,12 +226,12 @@ class Metric {
   template <typename T, int32_t N>
   void computeIVSSIM( Results& Result, const Image<T, N>& imageA, const Image<T, N>& imageB );
 
-  mutable std::vector<std::vector<double>> gaussian_window_;
-  mutable int                              window_size_    = 11;
-  mutable double                           gaussian_sigma_ = 1.5;
-  std::vector<Results>                     results_;
+  mutable std::vector<std::vector<double>> gaussianWindow_;
+  mutable int                              windowSize_           = 11;
+  mutable double                           gaussianSigma_        = 1.5;
   bool                                     computeOmMetrics_     = true;
   bool                                     computeSsimMetrics_   = true;
   bool                                     computeIvssimMetrics_ = true;
   bool                                     computeQmiv_          = true;
+  std::vector<Results>                     results_;
 };
