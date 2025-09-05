@@ -6,8 +6,8 @@ project(${MYNAME} C CXX)
 
 # Building options
 set(GSCM_VERSION_MAJOR            2 )
-set(GSCM_VERSION_MINOR            0 )
-set(CMAKE_CXX_STANDARD            23)
+set(GSCM_VERSION_MINOR            1 )
+set(CMAKE_CXX_STANDARD            23) 
 set(CMAKE_CXX_STANDARD_REQUIRED   OFF)
 set(CMAKE_CXX_EXTENSIONS          OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

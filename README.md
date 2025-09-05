@@ -32,7 +32,6 @@ cmake --build . --config Release --parallel 20
 
 The command `clear.sh all` can be used to remove all dependencies.
 
-
 # Depensencies
 
 Mpeg-gsc-metric project uses:
@@ -44,10 +43,6 @@ Mpeg-gsc-metric project uses:
 # Usage 
 
 The mpeg-gsc-metric input parameters are listed below:
-
-
-
-usage: C:\Users\ricar\dev\mpeg-gsc-metric_mpeg\build\Release\bin\Release\mpeg-gsc-metrics.exe [arguments...]
 
 | --key=default value | Usage |
 |-----|-----|
@@ -73,8 +68,15 @@ usage: C:\Users\ricar\dev\mpeg-gsc-metric_mpeg\build\Release\bin\Release\mpeg-gs
 | **Rendering**               | |
 |       --cpu=0               | Use CPU rendering <br> |
 |       --float=0             | Use floatting point images <br> |
+|       --compareCpuGpu=0     | Compare CPU/GPU rendering <br> |
+| **metrics**                 | |
+|       --computeOm=1         | Compute OM metrics (OM-PSNR and OM-SSIM) <br> |
+|       --computeSsim=1       | Compute SSIM metrics <br> |
+|       --computeIvssim=1     | Compute IVSSIM metrics <br> |
+|       --computeQmiv=0       | Compute color transform and average as QMIV <br> |
 | **Options**                 | |
 | -s,   --save=0              | Save generated videos <br> |
+| -o,   --output=""           | Output text file for metrics <br> |
 
 ## Examples
 
@@ -96,8 +98,7 @@ The next section presents some example of command line used to compute metric.
      -b dec_%04d.ply \
      -i 0 \
      -f 32 \
-     -n 16 \
-Metric : MSE RGB =     0.000000     0.000000     0.000000 PSNR RGB =   999.990000   999.990000   999.990000 MSE YUV =     0.000000     0.000000     0.000000 PSNR YUV =   999.990000   999.990000   999.990000
+     -n 16 
 ```
 
 ### Loaded viewpoints
@@ -109,7 +110,6 @@ Metric : MSE RGB =     0.000000     0.000000     0.000000 PSNR RGB =   999.99000
      --viewpoints ./config/viewpoints.txt
      --cpu 1 \
      -v  
-Metric : MSE RGB =     0.000000     0.000000     0.000000 PSNR RGB =   999.990000   999.990000   999.990000 MSE YUV =     0.000000     0.000000     0.000000 PSNR YUV =   999.990000   999.990000   999.990000
 ```
 
 ### Create video 
