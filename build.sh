@@ -3,10 +3,9 @@
 CURDIR=$( cd "$( dirname "$0" )" && pwd ); 
 echo -e "\033[0;32mBuild: ${CURDIR} \033[0m";
 
-CMAKE=""; 
-if [ "$( cmake  --version 2>&1 | grep version | awk '{print $3 }' | awk -F '.' '{print $1}' )" == 3 ] ; then CMAKE=cmake; fi
-if [ "$( cmake3 --version 2>&1 | grep version | awk '{print $3 }' | awk -F '.' '{print $1}' )" == 3 ] ; then CMAKE=cmake3; fi
-if [ "$CMAKE" == "" ] ; then echo "Can't find cmake > 3.0"; exit; fi
+CMAKE="cmake"; 
+if [ "$( cmake  --version 2>&1 | grep version | awk '{print $3 }' | awk -F '.' '{print $1}' )" -ge 3 ] ; then CMAKE=cmake; fi
+if [ "$CMAKE" == "" ] ; then echo "Can't find cmake >= 3.0"; exit; fi
 
 print_usage()
 {

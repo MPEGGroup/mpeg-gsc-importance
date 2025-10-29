@@ -218,6 +218,8 @@ void RasterizerHardware::render( const Pointcloud&  pc,
   glMemoryBarrier( GL_SHADER_STORAGE_BARRIER_BIT );
   glMemoryBarrier( GL_SHADER_IMAGE_ACCESS_BARRIER_BIT );
 
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   // Image
   glReadBuffer( GL_COLOR_ATTACHMENT0 );
   Image<glm::vec4, 1> buffer( width_, height_, glm::vec4( 0 ) );

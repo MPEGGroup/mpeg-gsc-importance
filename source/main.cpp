@@ -68,6 +68,7 @@ struct Parameters {
   int32_t     onlyViewpoint_     = -1;
   int32_t     width_             = 1024;
   int32_t     height_            = 768;
+  int32_t     numThreads_        = 0;
   std::string outputPath_        = "";
   bool        computeOm_         = true;
   bool        computeSsim_       = true;
@@ -83,6 +84,7 @@ struct Parameters {
         ("h,help",            help_,              false,              "This help text")
         ("c,config",          po::parseConfigFile,                    "Configuration file name")
         ("v,verbose",         verbose_,           verbose_,           "Verbose")
+
       ( po::Section("Input paths") )      
         ( "a,source",         sourcePath_,        sourcePath_,        "Source 3DGS path" )
         ( "b,decode",         decodePath_,        decodePath_,        "Decode 3DGS path" )
@@ -105,8 +107,9 @@ struct Parameters {
         ("cpu",               useCPU_,            useCPU_,            "Use CPU rendering")
         ("float",             useFloat_,          useFloat_,          "Use floatting point images")
         ("compareCpuGpu",     compareCpuGpu_,     compareCpuGpu_,     "Compare CPU/GPU rendering")
+        ("threads",           numThreads_,        numThreads_,        "Number of threads to use by OpenMP (0=auto)")
 
-      (po::Section("metrics"))  
+      (po::Section("Metrics"))
         ("computeOm",         computeOm_,         computeOm_,         "Compute OM metrics (OM-PSNR and OM-SSIM)")
         ("computeSsim",       computeSsim_,       computeSsim_,       "Compute SSIM metrics")
         ("computeIvssim",     computeIvssim_,     computeIvssim_,     "Compute IVSSIM metrics")
@@ -119,7 +122,7 @@ struct Parameters {
 
     /* clang-format on */
     po::setDefaults( opts );
-    po::ErrorReporter             err;
+    po::ErrorReporter err;
     const std::list<const char*>& argv_unhandled = po::scanArgv( opts, argc, (const char**)argv, err );
     if ( argc == 1 || help_ || sourcePath_.empty() || decodePath_.empty() || argv_unhandled.size() != 0 ||
          err.is_errored ) {
@@ -140,6 +143,9 @@ struct Parameters {
     if ( ( !useCameraPosition_ ) && viewpointPath_.empty() && numPoints_ == 0 ) {
       printf( "Viewpoints configuration is not correclty defined \n" );
       return 1;
+    }
+    if ( verbose_ ) {
+      dumpCfg( std::cout, opts );
     }
     return 0;
   }
@@ -167,16 +173,25 @@ int main( int32_t argc, char* argv[] ) {
   Metric            metric( params.computeOm_, params.computeSsim_, params.computeIvssim_, params.computeQmiv_ );
   Rasterizer        rasterizer( params.useCPU_ ), rasterizerCpu( true ), rasterizerGpu( false );
   Timer             timer;
-
+#if defined( USE_OPENMP )
+  omp_set_dynamic(0);
+  if ( params.numThreads_ > 0 ) {
+    omp_set_num_threads( params.numThreads_ );
+  } else {
+    omp_set_num_threads(omp_get_num_procs());
+  }
+#endif
   for ( int32_t frameIndex = 0; frameIndex < params.frameCount_; frameIndex++ ) {
+    
     // Load pointclouds
     Pointcloud pc[2];
     timer.tic( "Read" );
     if ( !pc[0].read( params.sourcePath_, params.startFrame_ + frameIndex, params.verbose_ ) ) return 1;
     if ( !pc[1].read( params.decodePath_, params.startFrame_ + frameIndex, params.verbose_ ) ) return 1;
     timer.toc( "Read", params.verbose_ );
-    if ( params.verbose_ )
+    if ( params.verbose_ ){
       for ( int32_t i = 0; i < 2; i++ ) pc[i].trace();
+    }
 
     // Create viewpoint list
     Viewpoints viewpoints;
@@ -256,7 +271,7 @@ int main( int32_t argc, char* argv[] ) {
           printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
                   viewpoints.size() );
 #if defined( USE_OPENMP )
-          printf( "Thread %2d / %2d ", omp_get_thread_num(), omp_get_num_threads() );
+          printf( "Thread %2d / %2d (dynamic=%d) ", omp_get_thread_num(), omp_get_num_threads(), omp_get_dynamic() );
 #endif
           printf( "\n" );
           fflush( stdout );

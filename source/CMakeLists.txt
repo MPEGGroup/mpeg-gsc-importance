@@ -19,11 +19,17 @@ file(GLOB CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
                     ${CMAKE_SOURCE_DIR}/dependencies/program-options-lite/*.cpp 
                     ${CMAKE_SOURCE_DIR}/dependencies/glad/src/glad.c)
 
- SET( LIBS "")
+find_package(Threads REQUIRED)
+SET( LIBS Threads::Threads)
 if ( NOT USE_CPU_ONLY ) 
   list(APPEND LIBS ${GLFW_LIBRARIES})
 else()
-  list (APPEND LIBS dl)
+  message("CPU only mode, disabling GLFW linking")
+  if (WIN32)
+    list (APPEND LIBS gdi32 user32)
+  else()
+    list (APPEND LIBS dl)
+  endif()
 endif()
 
 list(APPEND LIBS ${LIB_PMBB_IVQM_NAME})
@@ -31,9 +37,9 @@ list(APPEND LIBS ${LIB_PMBB_CORE_NAME})
 list(APPEND LIBS ${LIB_PMBB_BASE_NAME})
 list(APPEND LIBS fmt::fmt)
 
-IF(USE_OPENMP)
+if(USE_OPENMP)
   list(APPEND LIBS OpenMP::OpenMP_CXX)
-ENDIF()
+endif()
 create_executable( NAME       mpeg-gsc-metrics 
                    SOURCES    ${CPP_FILES} 
                    INCLUDES   ${CMAKE_SOURCE_DIR}/source
