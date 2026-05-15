@@ -1,9 +1,7 @@
 /build/
 /dependencies/glm
 /dependencies/glfw
-/dependencies/glfw
-
-
+/dependencies/fmtlib
 
 # template
 *.rgb

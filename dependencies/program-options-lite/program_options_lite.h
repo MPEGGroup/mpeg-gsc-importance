@@ -418,17 +418,12 @@ class OptionSpecific {
     std::string cDescriptionBuffer;
 
     for ( unsigned int uiK = 0; uiK < uiMaxNum; uiK++ ) {
-      // it needs to be reset when extra digit is added, e.g. number 10 and above
-      cNameBuffer.resize( name.size() + 10 );
-      cDescriptionBuffer.resize( desc.size() + 10 );
-
-      // isn't there are sprintf function for string??
-      sprintf( (char*)cNameBuffer.c_str(), name.c_str(), uiK, uiK );
-      sprintf( (char*)cDescriptionBuffer.c_str(), desc.c_str(), uiK, uiK );
-
-      size_t pos = cNameBuffer.find_first_of( '\0' );
-      if ( pos != std::string::npos ) { cNameBuffer.resize( pos ); }
-
+      cNameBuffer.resize(name.size() + 12); 
+      int name_len = snprintf(&cNameBuffer[0], cNameBuffer.size(), name.c_str(), uiK, uiK);
+      cNameBuffer.resize(name_len);
+      cDescriptionBuffer.resize(desc.size() + 12); 
+      int desc_len = snprintf(&cDescriptionBuffer[0], cDescriptionBuffer.size(), desc.c_str(), uiK, uiK);
+      cDescriptionBuffer.resize(desc_len);
       parent.addOption( new Option<T>( cNameBuffer, ( storage[uiK] ), default_val, cDescriptionBuffer ) );
     }
 
@@ -445,17 +440,12 @@ class OptionSpecific {
     std::string cDescriptionBuffer;
 
     for ( unsigned int uiK = 0; uiK < uiMaxNum; uiK++ ) {
-      // it needs to be reset when extra digit is added, e.g. number 10 and above
-      cNameBuffer.resize( name.size() + 10 );
-      cDescriptionBuffer.resize( desc.size() + 10 );
-
-      // isn't there are sprintf function for string??
-      sprintf( (char*)cNameBuffer.c_str(), name.c_str(), uiK, uiK );
-      sprintf( (char*)cDescriptionBuffer.c_str(), desc.c_str(), uiK, uiK );
-
-      size_t pos = cNameBuffer.find_first_of( '\0' );
-      if ( pos != std::string::npos ) cNameBuffer.resize( pos );
-
+      cNameBuffer.resize(name.size() + 12); 
+      int name_len = snprintf(&cNameBuffer[0], cNameBuffer.size(), name.c_str(), uiK, uiK);
+      cNameBuffer.resize(name_len);
+      cDescriptionBuffer.resize(desc.size() + 12);     
+      int desc_len = snprintf(&cDescriptionBuffer[0], cDescriptionBuffer.size(), desc.c_str(), uiK, uiK);
+      cDescriptionBuffer.resize(desc_len);
       parent.addOption( new Option<T>( cNameBuffer, *( storage[uiK] ), default_val, cDescriptionBuffer ) );
     }
 

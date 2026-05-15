@@ -361,6 +361,14 @@ class Pointcloud {
     std::array<float, 48> sh;
     std::array<float, 3>  normal;
     for ( const auto& data : gaussianData_ ) {
+      sh[0] = data.sh_[0][0];  
+      sh[1] = data.sh_[0][1];   
+      sh[2] = data.sh_[0][2];   
+      for ( size_t sh_idx = 1; sh_idx < 16; ++sh_idx ) {
+        sh[3 + sh_idx - 1]  = data.sh_[sh_idx][0];  
+        sh[3 + sh_idx + 14] = data.sh_[sh_idx][1];   
+        sh[3 + sh_idx + 29] = data.sh_[sh_idx][2];  
+      }
       file.write( reinterpret_cast<const char*>( &data.xyz_ ), sizeof( data.xyz_ ) );
       file.write( reinterpret_cast<const char*>( normal.data() ), sizeof( normal ) );
       file.write( reinterpret_cast<const char*>( sh.data() ), sizeof( sh ) );

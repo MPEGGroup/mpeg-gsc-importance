@@ -72,7 +72,7 @@ struct Parameters {
   std::string outputPath_        = "";
   bool        computeOm_         = true;
   bool        computeSsim_       = true;
-  bool        computeIvssim_     = true;
+  bool        computeIvssim_     = false;
   bool        computeQmiv_       = false;
 
   bool parse( int32_t argc, char* argv[] ) {
@@ -215,11 +215,21 @@ int main( int32_t argc, char* argv[] ) {
           fflush( stdout );
           return 1;
         }
-        viewpoints.resize( cameraPosition0.size() );
-        for ( size_t i = 0; i < cameraPosition0.size(); i++ ) {
-          const auto& el = cameraPosition0[i];
-          viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_ );
-          if ( params.verbose_ ) el.log();
+        if (params.onlyViewpoint_ != -1 && params.onlyViewpoint_ < cameraPosition0.size()) {
+          viewpoints.resize(1);
+          const auto& el = cameraPosition0[params.onlyViewpoint_];
+          viewpoints[0].set( el.pos(), el.view(), el.up(), el.focal_ );
+          if ( params.verbose_ ) { 
+            printf("onlyViewpoint == %d, keep only one viewpoint \n", params.onlyViewpoint_);
+            el.log();
+          }
+        } else {
+          viewpoints.resize( cameraPosition0.size() );
+          for ( size_t i = 0; i < cameraPosition0.size(); i++ ) {
+            const auto& el = cameraPosition0[i];
+            viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_ );
+            if ( params.verbose_ ) el.log();
+         }
         }
         params.numPoints_ = viewpoints.size();
       } else {
@@ -253,20 +263,19 @@ int main( int32_t argc, char* argv[] ) {
       for ( int32_t i = 0; i < 2; i++ ) videoOcm[i].resize( numFrames, params.width_, params.height_ );
     }
 
-// Rendering
+    // Rendering
 #pragma omp parallel if ( params.useCPU_ )
     {
 #pragma omp for
       for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
         auto  imageFloat = std::array<Image<float>, 2>{ Image<float, 3>( params.width_, params.height_ ),
-                                                       Image<float, 3>( params.width_, params.height_ ) };
+                                                        Image<float, 3>( params.width_, params.height_ ) };
         auto  imageUint8 = std::array<Image<uint8_t>, 2>{ Image<uint8_t, 3>( params.width_, params.height_ ),
-                                                         Image<uint8_t, 3>( params.width_, params.height_ ) };
+                                                          Image<uint8_t, 3>( params.width_, params.height_ ) };
         auto  imageOcm   = std::array<Image<uint8_t, 1>, 2>{ Image<uint8_t, 1>( params.width_, params.height_ ),
                                                           Image<uint8_t, 1>( params.width_, params.height_ ) };
         auto& viewpoint  = viewpoints[viewpointIndex];
         Image<uint8_t, 1> imageOcmUnion;
-        if ( params.onlyViewpoint_ != -1 && viewpointIndex != params.onlyViewpoint_ ) continue;
         if ( params.verbose_ ) {
           printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
                   viewpoints.size() );

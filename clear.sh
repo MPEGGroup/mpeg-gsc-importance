@@ -8,7 +8,8 @@ rm -rf ${CURDIR}/build
 if [ "$#" -gt "0" ] 
 then
   for name in glfw \
-              glm 
+              glm \
+              fmtlib
   do
     if [ "$1" == "${name}" ] || [ "$1" == "all" ]
     then 

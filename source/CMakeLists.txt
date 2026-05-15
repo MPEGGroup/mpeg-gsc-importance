@@ -4,11 +4,9 @@ set(VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
 add_custom_target( genversion
                    COMMAND ${CMAKE_COMMAND} -D OUTPUT=${CMAKE_CURRENT_BINARY_DIR}
                                             -D VERSION_NUMBER=v${GSCM_VERSION_MAJOR}.${GSCM_VERSION_MINOR}
-                                            -P ${CMAKE_SOURCE_DIR}/dependencies/cmake/genversion.cmake
+                                            -P ${PROJECT_SOURCE_DIR}/dependencies/cmake/genversion.cmake
                    BYPRODUCTS ${VERSION_FILE}
-                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} )
-add_custom_command( OUTPUT ${VERSION_FILE} COMMAND ${CMAKE_COMMAND} 
-                    -E echo "Generating ${VERSION_FILE}" DEPENDS genversion )
+                   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} )
 
 ########################### Main applications ###########################
 
@@ -16,8 +14,8 @@ LINK_DIRECTORIES( ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ${GLFW_LIBRARY_DIR} )
 
 file(GLOB CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp 
                     ${CMAKE_CURRENT_SOURCE_DIR}/util/*.cpp 
-                    ${CMAKE_SOURCE_DIR}/dependencies/program-options-lite/*.cpp 
-                    ${CMAKE_SOURCE_DIR}/dependencies/glad/src/glad.c)
+                    ${PROJECT_SOURCE_DIR}/dependencies/program-options-lite/*.cpp 
+                    ${PROJECT_SOURCE_DIR}/dependencies/glad/src/glad.c)
 
 find_package(Threads REQUIRED)
 SET( LIBS Threads::Threads)
@@ -38,17 +36,17 @@ list(APPEND LIBS ${LIB_PMBB_BASE_NAME})
 list(APPEND LIBS fmt::fmt)
 
 if(USE_OPENMP)
-  list(APPEND LIBS OpenMP::OpenMP_CXX)
+  list(APPEND LIBS OpenMP::OpenMP_CXX omp)
 endif()
 create_executable( NAME       mpeg-gsc-metrics 
                    SOURCES    ${CPP_FILES} 
-                   INCLUDES   ${CMAKE_SOURCE_DIR}/source
-                              ${CMAKE_SOURCE_DIR}/source/util
-                              ${CMAKE_SOURCE_DIR}/dependencies
-                              ${CMAKE_SOURCE_DIR}/dependencies/glm
-                              ${CMAKE_SOURCE_DIR}/dependencies/glad/include
+                   INCLUDES   ${PROJECT_SOURCE_DIR}/source
+                              ${PROJECT_SOURCE_DIR}/source/util
+                              ${PROJECT_SOURCE_DIR}/dependencies
+                              ${PROJECT_SOURCE_DIR}/dependencies/glm
+                              ${PROJECT_SOURCE_DIR}/dependencies/glad/include
                               ${GLFW_INCLUDE_DIR} 
-                              ${fmtlib_SOURCE_DIR}/include
+                              ${PROJECT_SOURCE_DIR}/dependencies/fmtlib/include
                               ${${LIB_PMBB_BASE_NAME}_SOURCE_DIR}/src
                               ${${LIB_PMBB_CORE_NAME}_SOURCE_DIR}/src
                               ${${LIB_PMBB_IVQM_NAME}_SOURCE_DIR}/src
