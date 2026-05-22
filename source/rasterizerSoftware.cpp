@@ -125,6 +125,12 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
   int32_t numPoints = pc.size();
   int32_t count     = 0;
   auto    focal     = viewpoint.focal();
+  
+  if ( viewpoint.originalHeight() > 0 ) {
+    float scale = static_cast<float>(height) / static_cast<float>(viewpoint.originalHeight());
+    focal = focal * scale;
+  }
+  
   float   fov       = 2 * atan( 1.0f / ( 2 * focal[1] / image.height() ) );
   Camera  camera;
   camera.create( 10.f, fov );

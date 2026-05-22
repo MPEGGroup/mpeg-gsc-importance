@@ -39,16 +39,20 @@
 class Camera {
  public:
   Camera( int width = 0, int height = 0, float fov = glm::radians( 45.f ) ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ) {
+      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ), width_(width), height_(height) {
     initialize( width, height );
   }
   Camera( int width, int height, float fov, const glm::vec3 ePos, const glm::vec3 eCenter, const glm::vec3 eUp ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ) {
+      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ), width_(width), height_(height) {
     initialize( width, height );
     setLookAt( ePos, eCenter, eUp );
   }
 
-  void initialize( int width, int height ) { ratio_ = (float)width / (float)height; }
+  void initialize( int width, int height ) { 
+    width_ = width;
+    height_ = height;
+    ratio_ = (float)width / (float)height; 
+  }
 
   void create( const float fBoxSize, const float fFov ) {
     rotation_ = glm::quat( 1, 0, 0, 0 );
@@ -58,8 +62,14 @@ class Camera {
     fov_      = fFov;
   }
 
+  void setFov(float fov) {
+    fov_ = fov;
+  }
+
   glm::vec3 center() { return center_; }
   glm::vec3 getPosition() const { return glm::toMat3( rotation_ ) * glm::vec3( 0, 0, dist_ ) + center_; }
+  int getWidth() const { return width_; }
+  int getHeight() const { return height_; }
 
   glm::mat4 viewMat() {
     glm::mat3 mat = glm::toMat3( rotation_ );
@@ -137,4 +147,6 @@ class Camera {
   float     ratio_;
   float     fov_     = glm::radians( 45.0f );
   glm::vec2 nearFar_ = { 0.010000f, 10000000000.0f };
+  int       width_   = 0;
+  int       height_  = 0;
 };

@@ -1,4 +1,3 @@
-
 /* The copyright in this software is being made available under the BSD
  * Licence, included below.  This software may be subject to other third
  * party and contributor rights, including patent rights, and no such
@@ -218,7 +217,7 @@ int main( int32_t argc, char* argv[] ) {
         if (params.onlyViewpoint_ != -1 && params.onlyViewpoint_ < cameraPosition0.size()) {
           viewpoints.resize(1);
           const auto& el = cameraPosition0[params.onlyViewpoint_];
-          viewpoints[0].set( el.pos(), el.view(), el.up(), el.focal_ );
+          viewpoints[0].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_ );
           if ( params.verbose_ ) { 
             printf("onlyViewpoint == %d, keep only one viewpoint \n", params.onlyViewpoint_);
             el.log();
@@ -227,7 +226,7 @@ int main( int32_t argc, char* argv[] ) {
           viewpoints.resize( cameraPosition0.size() );
           for ( size_t i = 0; i < cameraPosition0.size(); i++ ) {
             const auto& el = cameraPosition0[i];
-            viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_ );
+            viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_ );
             if ( params.verbose_ ) el.log();
          }
         }

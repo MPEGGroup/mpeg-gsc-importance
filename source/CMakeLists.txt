@@ -36,7 +36,10 @@ list(APPEND LIBS ${LIB_PMBB_BASE_NAME})
 list(APPEND LIBS fmt::fmt)
 
 if(USE_OPENMP)
-  list(APPEND LIBS OpenMP::OpenMP_CXX omp)
+  list(APPEND LIBS OpenMP::OpenMP_CXX)
+  if(APPLE)
+    list(APPEND LIBS omp)
+  endif()
 endif()
 create_executable( NAME       mpeg-gsc-metrics 
                    SOURCES    ${CPP_FILES} 

@@ -82,4 +82,7 @@ template void Rasterizer::render<uint16_t>( Pointcloud const&,
                                             const Viewpoint&,
                                             Image<uint16_t, 3>&,
                                             Image<uint8_t, 1>& );
-template void Rasterizer::render<float>( Pointcloud const&, const Viewpoint&, Image<float, 3>&, Image<uint8_t, 1>& );
+template void Rasterizer::render<float>( Pointcloud const&,
+                                         const Viewpoint&,
+                                         Image<float, 3>&,
+                                         Image<uint8_t, 1>& );

@@ -1,4 +1,3 @@
-
 /* The copyright in this software is being made available under the BSD
  * Licence, included below.  This software may be subject to other third
  * party and contributor rights, including patent rights, and no such
@@ -51,14 +50,16 @@ struct CameraPosition {
   glm::vec3   position_;
   glm::quat   orientation_;
   glm::vec2   focal_;
+  int32_t     width_;
+  int32_t     height_;
   std::string name_;
   void        log() const {
     printf(
         "index = %8d id = %8d xyz= %16.10f %16.10f %16.10f quat = %16.10f %16.10f %16.10f %16.10f focal = %16.10f "
-        "%16.10f %s "
+        "%16.10f width = %8d height = %8d %s "
         "\n",
         index_, cameraId_, position_.x, position_.y, position_.z, orientation_.x, orientation_.y, orientation_.z,
-        orientation_.w, focal_.x, focal_.y, name_.c_str() );
+        orientation_.w, focal_.x, focal_.y, width_, height_, name_.c_str() );
   }
 
   void updateView( glm::vec3& eEye, glm::vec3& eCenter, glm::vec3& eUp ) const {
@@ -86,11 +87,16 @@ struct CameraPosition {
     updateView( eEye, eCenter, eUp );
     return eUp;
   }
+  
   bool operator==( const CameraPosition& other ) const {
     return index_ == other.index_ && cameraId_ == other.cameraId_ && position_ == other.position_ &&
-           orientation_ == other.orientation_ && focal_ == other.focal_ && name_ == other.name_;
+           orientation_ == other.orientation_ && focal_ == other.focal_ && 
+           width_ == other.width_ && height_ == other.height_ &&   
+           name_ == other.name_;
   }
-  bool            operator!=( const CameraPosition& other ) const { return !( *this == other ); }
+  
+  bool operator!=( const CameraPosition& other ) const { return !( *this == other ); }
+  
   CameraPosition& operator=( const CameraPosition& other ) {
     if ( this != &other ) {
       index_       = other.index_;
@@ -98,6 +104,8 @@ struct CameraPosition {
       position_    = other.position_;
       orientation_ = other.orientation_;
       focal_       = other.focal_;
+      width_       = other.width_;   
+      height_      = other.height_;
       name_        = other.name_;
     }
     return *this;
@@ -209,10 +217,10 @@ class Pointcloud {
           CameraPosition     el;
           if ( ss >> el.index_ >> el.cameraId_ >> el.position_.x >> el.position_.y >> el.position_.z >>
                el.orientation_.w >> el.orientation_.x >> el.orientation_.y >> el.orientation_.z >> el.focal_.x >>
-               el.focal_.y >> el.name_ ) {
+               el.focal_.y >> el.width_ >> el.height_ >> el.name_ ) {
             cameraPosition_.push_back( el );
           } else {
-            std::cerr << "Error: Can't read line.\n";
+            std::cerr << "Error: Can't read camera position line.\n";
           }
         }
       } else {
