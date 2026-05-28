@@ -5,7 +5,7 @@ string(REPLACE " " "_" MYNAME ${MYNAME})
 project(${MYNAME} C CXX)
 
 # Building options
-set(GSCM_VERSION_MAJOR            3 )
+set(GSCM_VERSION_MAJOR            4 )
 set(GSCM_VERSION_MINOR            0 )
 set(CMAKE_CXX_STANDARD            23) 
 set(CMAKE_CXX_STANDARD_REQUIRED   OFF)
