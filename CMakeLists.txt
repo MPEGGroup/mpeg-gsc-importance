@@ -53,18 +53,18 @@ endif()
 message("BUILD_IMP_SCORES = ${BUILD_IMP_SCORES}")
 
 # Cmake dependencies
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/CPM.cmake)
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/tools.cmake)
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/clang-format.cmake)
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/cppcheck.cmake)
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/glm.cmake)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/CPM.cmake)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/tools.cmake)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/clang-format.cmake)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/cppcheck.cmake)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/glm.cmake)
 if ( NOT USE_CPU_ONLY )
-  include(${CMAKE_SOURCE_DIR}/dependencies/cmake/glfw.cmake)
+  include(${PROJECT_SOURCE_DIR}/dependencies/cmake/glfw.cmake)
 endif()
-include(${CMAKE_SOURCE_DIR}/dependencies/cmake/fmtlib.cmake)
-add_subdirectory(${CMAKE_SOURCE_DIR}/dependencies/pmbb-base libpmbb-base)
-add_subdirectory(${CMAKE_SOURCE_DIR}/dependencies/pmbb-core libpmbb-core)
-add_subdirectory(${CMAKE_SOURCE_DIR}/dependencies/pmbb-ivqm libpmbb-ivqm)
+include(${PROJECT_SOURCE_DIR}/dependencies/cmake/fmtlib.cmake)
+add_subdirectory(${PROJECT_SOURCE_DIR}/dependencies/pmbb-base libpmbb-base)
+add_subdirectory(${PROJECT_SOURCE_DIR}/dependencies/pmbb-core libpmbb-core)
+add_subdirectory(${PROJECT_SOURCE_DIR}/dependencies/pmbb-ivqm libpmbb-ivqm)
 
 # Include 
 include_directories(${PROJECT_SOURCE_DIR}/external/stb)
@@ -75,6 +75,6 @@ if( APPLE )
 endif()
 
 # Build
-add_subdirectory(${CMAKE_SOURCE_DIR}/source)
+add_subdirectory(${PROJECT_SOURCE_DIR}/source)
 
 
