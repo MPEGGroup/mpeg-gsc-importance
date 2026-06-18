@@ -119,7 +119,8 @@ template <typename T, int N>
 void RasterizerSoftware::render( const Pointcloud&  pc,
                                  const Viewpoint&   viewpoint,
                                  Image<T, N>&       image,
-                                 Image<uint8_t, 1>& ocm ) {
+                                 Image<uint8_t, 1>& ocm,
+                                 std::vector<float>* transSums ) {
   int     width     = image.width();
   int     height    = image.height();
   int32_t numPoints = pc.size();
@@ -193,7 +194,11 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
             if ( test_t <= 1e-4f ) {
               done[0].get( u, v ) = 1;
             } else {
-              value = glm::vec4( value.xyz() + color.xyz() * alpha * t, test_t );
+              auto vis = alpha * t;
+              if ( transSums != nullptr ){
+                (*transSums)[i] += vis * vis;
+              }
+              value = glm::vec4( value.xyz() + color.xyz() * vis, test_t );
             }
           }
         }
@@ -206,12 +211,15 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
 template void RasterizerSoftware::render<uint8_t>( Pointcloud const&,
                                                    const Viewpoint&,
                                                    Image<uint8_t>&,
-                                                   Image<uint8_t, 1>& );
+                                                   Image<uint8_t, 1>&,
+                                                   std::vector<float>* transSums );
 template void RasterizerSoftware::render<uint16_t>( Pointcloud const&,
                                                     const Viewpoint&,
                                                     Image<uint16_t>&,
-                                                    Image<uint8_t, 1>& );
+                                                    Image<uint8_t, 1>&,
+                                                    std::vector<float>* transSums );
 template void RasterizerSoftware::render<float>( Pointcloud const&,
                                                  const Viewpoint&,
                                                  Image<float>&,
-                                                 Image<uint8_t, 1>& );
+                                                 Image<uint8_t, 1>&,
+                                                 std::vector<float>* transSums );

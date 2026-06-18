@@ -289,16 +289,16 @@ int main( int32_t argc, char* argv[] ) {
         if ( !params.compareCpuGpu_ ) {
           for ( int32_t i = 0; i < 2; i++ )
             if ( params.useFloat_ )
-              rasterizer.render( pc[i], viewpoint, imageFloat[i], imageOcm[i] );
+              rasterizer.render( pc[i], viewpoint, imageFloat[i], imageOcm[i], nullptr );
             else
-              rasterizer.render( pc[i], viewpoint, imageUint8[i], imageOcm[i] );
+              rasterizer.render( pc[i], viewpoint, imageUint8[i], imageOcm[i], nullptr );
         } else {
           if ( params.useFloat_ ) {
-            rasterizerCpu.render( pc[0], viewpoint, imageFloat[0], imageOcm[0] );
-            rasterizerGpu.render( pc[1], viewpoint, imageFloat[1], imageOcm[1] );
+            rasterizerCpu.render( pc[0], viewpoint, imageFloat[0], imageOcm[0], nullptr );
+            rasterizerGpu.render( pc[1], viewpoint, imageFloat[1], imageOcm[1], nullptr );
           } else {
-            rasterizerCpu.render( pc[0], viewpoint, imageUint8[0], imageOcm[0] );
-            rasterizerGpu.render( pc[1], viewpoint, imageUint8[1], imageOcm[1] );
+            rasterizerCpu.render( pc[0], viewpoint, imageUint8[0], imageOcm[0], nullptr );
+            rasterizerGpu.render( pc[1], viewpoint, imageUint8[1], imageOcm[1], nullptr );
           }
         }
         timer.toc( "Rasterize", params.verbose_ );

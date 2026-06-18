@@ -64,7 +64,7 @@ The mpeg-gsc-metric input parameters are listed below:
 | -n,   --numPoints=16        | Create N random viewpoints <br> |
 |       --display=0           | Show 3D model and viewpoints <br> |
 |       --saveViewpoints=0    | Save the generated viewpoints <br> |
-|       --onlyViewpoint=-1     | Only render the viewpoint <br> |
+|       --onlyViewpoint=-1    | Only render the viewpoint <br> |
 | **Rendering**               | |
 |       --cpu=0               | Use CPU rendering <br> |
 |       --float=0             | Use floatting point images <br> |
@@ -74,7 +74,7 @@ The mpeg-gsc-metric input parameters are listed below:
 |       --computeSsim=1       | Compute SSIM metrics <br> |
 |       --computeIvssim=1     | Compute IVSSIM metrics <br> |
 |       --computeQmiv=0       | Compute color transform and average as QMIV <br> |
-| **Options**                 | |
+| **Output**                  | |
 | -s,   --save=0              | Save generated videos <br> |
 | -o,   --output=""           | Output text file for metrics <br> |
 

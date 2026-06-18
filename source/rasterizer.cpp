@@ -63,26 +63,34 @@ template <typename T, int32_t N>
 void Rasterizer::render( const Pointcloud&  pc,
                          const Viewpoint&   viewpoint,
                          Image<T, N>&       image,
-                         Image<uint8_t, 1>& ocm ) {
+                         Image<uint8_t, 1>& ocm,
+                         std::vector<float>* transSums ) {
 #if defined( USE_GLFW )
   if ( useSoftware_ )
-    rasterizerSoftware_->render( pc, viewpoint, image, ocm );
+    rasterizerSoftware_->render( pc, viewpoint, image, ocm, transSums );
   else
+
     rasterizerHardware_->render( pc, viewpoint, image, ocm );
 #else
-  rasterizerSoftware_->render( pc, viewpoint, image, ocm );
+  rasterizerSoftware_->render( pc, viewpoint, image, ocm, transSums );
 #endif
 }
 
 template void Rasterizer::render<uint8_t>( Pointcloud const&,
                                            const Viewpoint&,
                                            Image<uint8_t, 3>&,
-                                           Image<uint8_t, 1>& );
+                                           Image<uint8_t, 1>&,
+                                           std::vector<float>*
+);
 template void Rasterizer::render<uint16_t>( Pointcloud const&,
                                             const Viewpoint&,
                                             Image<uint16_t, 3>&,
-                                            Image<uint8_t, 1>& );
+                                            Image<uint8_t, 1>&,
+                                            std::vector<float>*
+);
 template void Rasterizer::render<float>( Pointcloud const&,
                                          const Viewpoint&,
                                          Image<float, 3>&,
-                                         Image<uint8_t, 1>& );
+                                         Image<uint8_t, 1>&,
+                                         std::vector<float>* 
+);

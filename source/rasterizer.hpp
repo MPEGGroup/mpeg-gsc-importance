@@ -50,7 +50,7 @@ class Rasterizer {
   ~Rasterizer();
 
   template <typename T, int N>
-  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image, Image<uint8_t, 1>& ocm );
+  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image, Image<uint8_t, 1>& ocm, std::vector<float>* transSums );
 
  private:
   bool                                useSoftware_;

@@ -12,10 +12,19 @@ add_custom_target( genversion
 
 LINK_DIRECTORIES( ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} ${GLFW_LIBRARY_DIR} )
 
-file(GLOB CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp 
+file(GLOB COMMON_CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/metric.cpp 
+                    ${CMAKE_CURRENT_SOURCE_DIR}/rasterizer.cpp 
+                    ${CMAKE_CURRENT_SOURCE_DIR}/rasterizerHardware.cpp 
+                    ${CMAKE_CURRENT_SOURCE_DIR}/rasterizerSoftware.cpp 
                     ${CMAKE_CURRENT_SOURCE_DIR}/util/*.cpp 
                     ${PROJECT_SOURCE_DIR}/dependencies/program-options-lite/*.cpp 
                     ${PROJECT_SOURCE_DIR}/dependencies/glad/src/glad.c)
+
+set(MPEG_GSC_METRICS_MAIN
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
+
+set(IMPORTANCE_SCORES_MAIN
+    ${CMAKE_CURRENT_SOURCE_DIR}/importanceScores.cpp)
 
 find_package(Threads REQUIRED)
 SET( LIBS Threads::Threads)
@@ -41,17 +50,29 @@ if(USE_OPENMP)
     list(APPEND LIBS omp)
   endif()
 endif()
+
+set(COMMON_INCLUDES
+  ${PROJECT_SOURCE_DIR}/source
+  ${PROJECT_SOURCE_DIR}/source/util
+  ${PROJECT_SOURCE_DIR}/dependencies
+  ${PROJECT_SOURCE_DIR}/dependencies/glm
+  ${PROJECT_SOURCE_DIR}/dependencies/glad/include
+  ${GLFW_INCLUDE_DIR} 
+  ${fmtlib_SOURCE_DIR}/include
+  ${${LIB_PMBB_BASE_NAME}_SOURCE_DIR}/src
+  ${${LIB_PMBB_CORE_NAME}_SOURCE_DIR}/src
+  ${${LIB_PMBB_IVQM_NAME}_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
+
 create_executable( NAME       mpeg-gsc-metrics 
-                   SOURCES    ${CPP_FILES} 
-                   INCLUDES   ${PROJECT_SOURCE_DIR}/source
-                              ${PROJECT_SOURCE_DIR}/source/util
-                              ${PROJECT_SOURCE_DIR}/dependencies
-                              ${PROJECT_SOURCE_DIR}/dependencies/glm
-                              ${PROJECT_SOURCE_DIR}/dependencies/glad/include
-                              ${GLFW_INCLUDE_DIR} 
-                              ${PROJECT_SOURCE_DIR}/dependencies/fmtlib/include
-                              ${${LIB_PMBB_BASE_NAME}_SOURCE_DIR}/src
-                              ${${LIB_PMBB_CORE_NAME}_SOURCE_DIR}/src
-                              ${${LIB_PMBB_IVQM_NAME}_SOURCE_DIR}/src
-                              ${CMAKE_CURRENT_BINARY_DIR}
-                   LIBRARIES  ${LIBS} )  
+                   SOURCES    ${COMMON_CPP_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+                   INCLUDES   ${COMMON_INCLUDES}
+                   LIBRARIES  ${LIBS} ) 
+
+IF(BUILD_IMP_SCORES)
+  create_executable( NAME       importance-scores 
+                     SOURCES    ${COMMON_CPP_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/importanceScores.cpp
+                     INCLUDES   ${COMMON_INCLUDES}
+                     LIBRARIES  ${LIBS} )  
+ENDIF()

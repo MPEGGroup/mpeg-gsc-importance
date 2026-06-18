@@ -19,6 +19,9 @@ endif()
 
 option( USE_CPU_ONLY "CPU only, disbale GPU rendering and display mode"   OFF ) 
 option( USE_OPENMP   "Use OpenMP library if available"                    ON )
+option( BUILD_IMP_SCORES   "Build executable for importance score calculation" ON )
+
+
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -46,6 +49,8 @@ if( USE_OPENMP )
     message( FATAL_ERROR "Package OpenMP required, but not found!, please install apt install libomp-dev libomp5 or brew install libomp-dev libomp5" )  
   endif()
 endif()
+
+message("BUILD_IMP_SCORES = ${BUILD_IMP_SCORES}")
 
 # Cmake dependencies
 include(${CMAKE_SOURCE_DIR}/dependencies/cmake/CPM.cmake)
