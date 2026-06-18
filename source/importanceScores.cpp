@@ -166,7 +166,7 @@ int main( int32_t argc, char* argv[] ) {
       viewpoints.resize( cameraPosition.size() );
       for ( size_t i = 0; i < cameraPosition.size(); i++ ) {
         const auto& el = cameraPosition[i];
-        viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_ );
+        viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_ );
         if ( params.verbose_ ) el.log();
       }
       params.numPoints_ = viewpoints.size();
