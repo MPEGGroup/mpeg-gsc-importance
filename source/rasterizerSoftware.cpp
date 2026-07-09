@@ -46,6 +46,8 @@ RasterizerSoftware::~RasterizerSoftware() {}
 
 #define BLOCK_SIZE 16
 
+constexpr float kAlphaThreshold = 1.0f / 255.0f;
+
 template <typename T>
 T clamp( T v, T a, T b ) {
   return ( ( v < a ) ? a : ( ( v > b ) ? b : v ) );
@@ -119,8 +121,7 @@ template <typename T, int N>
 void RasterizerSoftware::render( const Pointcloud&  pc,
                                  const Viewpoint&   viewpoint,
                                  Image<T, N>&       image,
-                                 Image<uint8_t, 1>& ocm,
-                                 std::vector<float>* transSums ) {
+                                 Image<uint8_t, 1>& ocm ) {
   int     width     = image.width();
   int     height    = image.height();
   int32_t numPoints = pc.size();
@@ -194,11 +195,7 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
             if ( test_t <= 1e-4f ) {
               done[0].get( u, v ) = 1;
             } else {
-              auto vis = alpha * t;
-              if ( transSums != nullptr ){
-                (*transSums)[i] += vis * vis;
-              }
-              value = glm::vec4( value.xyz() + color.xyz() * vis, test_t );
+              value = glm::vec4( value.xyz() + color.xyz() * alpha * t, test_t );
             }
           }
         }
@@ -208,18 +205,118 @@ void RasterizerSoftware::render( const Pointcloud&  pc,
   image.from( buffer );
 }
 
+void accumulateTransmittanceSums( const Pointcloud& pc,
+                                  const glm::mat4&        viewMat,
+                                  const glm::mat4&        projMat,
+                                  const glm::vec2&        focal,
+                                  const glm::vec2&        window,
+                                  const glm::vec2&        halfWindow,
+                                  const std::vector<uint32_t>& sorted,
+                                  std::vector<float>&     transSums ) {
+  const int32_t width  = static_cast<int32_t>( window.x );
+  const int32_t height = static_cast<int32_t>( window.y );
+  std::vector<float>  transmittance( static_cast<size_t>( width ) * static_cast<size_t>( height ), 1.0f );
+  std::vector<uint8_t> done( static_cast<size_t>( width ) * static_cast<size_t>( height ), 0 );
+  const glm::mat3      viewMat3( viewMat );
+
+  for ( const auto& i : sorted ) {
+    float       radius;
+    const auto& gs = pc[i];
+    glm::vec4   t   = viewMat * gs.xyz_;
+    glm::vec4   p   = projMat * t;
+    glm::vec2   ndc( p.x / p.w, p.y / p.w );
+    glm::mat3   covar3d = computeCovariance3D( gs.rotate_, gs.scale_ );
+    glm::mat2   covar2d = computeCovariance2D( t.xyz(), covar3d, viewMat3, focal, window );
+    glm::vec3   conic   = computeConic( covar2d, radius );
+    glm::vec2   screen  = halfWindow * ndc + halfWindow;
+    float       opacity = gs.opacity_;
+    if ( opacity <= kAlphaThreshold ) continue;
+    float sigmaThresh = std::log( opacity / kAlphaThreshold );
+    const float sigmaXX = 0.5f * conic.x;
+    const float sigmaYY = 0.5f * conic.z;
+    const float sigmaXY = -conic.y;
+    float radiusU = radius;
+    float radiusV = radius;
+    float det = sigmaXX * sigmaYY - 0.25f * sigmaXY * sigmaXY;
+    if ( det > 1e-10f ) {
+      radiusU = std::min( radiusU, std::sqrt( std::max( sigmaThresh * sigmaYY / det, 0.0f ) ) );
+      radiusV = std::min( radiusV, std::sqrt( std::max( sigmaThresh * sigmaXX / det, 0.0f ) ) );
+    }
+
+    int32_t minU = std::max( static_cast<int32_t>( std::floor( screen.x - radiusU ) ), 0 );
+    int32_t minV = std::max( static_cast<int32_t>( std::floor( screen.y - radiusV ) ), 0 );
+    int32_t maxU = std::min( static_cast<int32_t>( std::ceil( screen.x + radiusU ) ), width - 1 );
+    int32_t maxV = std::min( static_cast<int32_t>( std::ceil( screen.y + radiusV ) ), height - 1 );
+
+    for ( int32_t v = minV; v <= maxV; ++v ) {
+      size_t row = static_cast<size_t>( v ) * static_cast<size_t>( width );
+      float  dy  = screen.y - static_cast<float>( v + 0.5f );
+      float  rowCross = sigmaXY * dy;
+      float  rowQuad  = sigmaYY * dy * dy;
+      float  sigma = 0.0f;
+      float  sigmaDelta = 0.0f;
+      float  dx0 = screen.x - static_cast<float>( minU + 0.5f );
+      sigma = sigmaXX * dx0 * dx0 + rowCross * dx0 + rowQuad;
+      sigmaDelta = -2.0f * sigmaXX * dx0 + sigmaXX - rowCross;
+      for ( int32_t u = minU; u <= maxU; ++u ) {
+        size_t idx = row + static_cast<size_t>( u );
+        float sigmaValue = sigma;
+        sigma += sigmaDelta;
+        sigmaDelta += 2.0f * sigmaXX;
+        if ( done[idx] != 0 ) continue;
+        if ( sigmaValue < 0.0f ) continue;
+        if ( sigmaValue > sigmaThresh ) continue;
+
+        float alpha = std::min( static_cast<float>( opacity * std::exp( -sigmaValue ) ), 0.999f );
+        if ( alpha >= kAlphaThreshold ) {
+          float t     = transmittance[idx];
+          float testT = t * ( 1.0f - alpha );
+          if ( testT <= 1e-4f ) {
+            done[idx] = 1;
+          } else {
+            float vis = alpha * t;
+            transSums[i] += vis * vis;
+            transmittance[idx] = testT;
+          }
+        }
+      }
+    }
+  }
+}
+
+void RasterizerSoftware::computeTransmittanceSums( const Pointcloud&  pc,
+                                                   const Viewpoint&   viewpoint,
+                                                   std::vector<float>& transSums ) {
+  int32_t width  = viewpoint.originalWidth();
+  int32_t height = viewpoint.originalHeight();
+  auto    focal  = viewpoint.getAdjustedFocal( height );
+
+  float   fov = 2 * atan( 1.0f / ( 2 * focal[1] / static_cast<float>( height ) ) );
+  Camera  camera;
+  camera.create( 10.f, fov );
+  camera.initialize( width, height );
+  camera.setLookAt( viewpoint.pos(), viewpoint.view(), viewpoint.up() );
+
+  glm::mat4 viewMat = camera.viewMat();
+  auto      projMat = camera.projMat();
+  auto      nearFar  = camera.nearFar();
+
+  const glm::vec2 window( width, height ), halfWindow( width * 0.5f, height * 0.5f );
+  auto            modelViewProj = projMat * viewMat;
+  auto            sorted        = pc.sort( modelViewProj, nearFar, true );
+
+  accumulateTransmittanceSums( pc, viewMat, projMat, focal, window, halfWindow, sorted, transSums );
+}
+
 template void RasterizerSoftware::render<uint8_t>( Pointcloud const&,
                                                    const Viewpoint&,
                                                    Image<uint8_t>&,
-                                                   Image<uint8_t, 1>&,
-                                                   std::vector<float>* transSums );
+                                                   Image<uint8_t, 1>& );
 template void RasterizerSoftware::render<uint16_t>( Pointcloud const&,
                                                     const Viewpoint&,
                                                     Image<uint16_t>&,
-                                                    Image<uint8_t, 1>&,
-                                                    std::vector<float>* transSums );
+                                                    Image<uint8_t, 1>& );
 template void RasterizerSoftware::render<float>( Pointcloud const&,
                                                  const Viewpoint&,
                                                  Image<float>&,
-                                                 Image<uint8_t, 1>&,
-                                                 std::vector<float>* transSums );
+                                                 Image<uint8_t, 1>& );

@@ -48,6 +48,22 @@
 #include <omp.h>
 #endif
 
+Viewpoint makeDownscaledViewpoint( const Viewpoint& viewpoint, float downscaleFactor, int32_t minimumWidth ) {
+  int32_t originalWidth  = viewpoint.originalWidth();
+  int32_t originalHeight = viewpoint.originalHeight();
+  if ( originalWidth <= 0 || originalHeight <= 0 ) { return viewpoint; }
+
+  int32_t downscaledWidth = static_cast<int32_t>( std::round( static_cast<double>( originalWidth ) / downscaleFactor ) );
+  int32_t newWidth        = std::max( minimumWidth, std::max( downscaledWidth, 1 ) );
+  float   ratio           = static_cast<float>( newWidth ) / static_cast<float>( originalWidth );
+  int32_t newHeight       = std::max( static_cast<int32_t>( std::round( static_cast<double>( originalHeight ) * ratio ) ), 1 );
+  glm::vec2 newFocal      = viewpoint.focal() * ratio;
+
+  Viewpoint scaled;
+  scaled.set( viewpoint.pos(), viewpoint.view(), viewpoint.up(), newFocal, newWidth, newHeight );
+  return scaled;
+}
+
 
 void saveImportanceScores(const std::vector<std::vector<float>>& impScores, const std::string& filePath, bool append){
   std::ofstream out(filePath, append ? std::ios::app : std::ios::out);
@@ -78,6 +94,8 @@ struct Parameters {
   int32_t     width_             = 1024;
   int32_t     height_            = 768;
   int32_t     numThreads_        = 0;
+  float       downscaleFactor_   = 1.0f;
+  int32_t     downscaleMinWidth_ = 1920;
   std::string impScoresPath_      = "";
 
   bool parse( int32_t argc, char* argv[] ) {
@@ -98,6 +116,8 @@ struct Parameters {
         ("f,frameCount",      frameCount_,        frameCount_,        "Number of frames")
         ("width",             width_,             width_,             "Width of the generated images")
         ("height",            height_,            height_,            "Height of the generated images")
+        ("downscaleFactor",   downscaleFactor_,   downscaleFactor_,   "Downscale factor applied to camera resolution")
+        ("downscaleMinWidth", downscaleMinWidth_, downscaleMinWidth_, "Minimum width after downscaling; height inferred from aspect ratio")
       
       (po::Section("Viewpoints"))        
         ("viewpoint",         viewpointPath_,     viewpointPath_,     "Viewpoint path used to load viewpoints")
@@ -118,6 +138,14 @@ struct Parameters {
       if ( impScoresPath_.empty() ) printf( "Warning: Importance Score output file is not defined. \n" );
       for ( const auto* const arg : argv_unhandled ) { err.warn() << "Unhandled argument ignored: " << arg << '\n'; }
       if ( err.is_errored ) err.error() << "Unhandled argument \n";
+      return 1;
+    }
+    if ( downscaleFactor_ < 1.0f ) {
+      err.error() << "downscaleFactor must be >= 1.0 \n";
+      return 1;
+    }
+    if ( downscaleMinWidth_ < 1 ) {
+      err.error() << "downscaleMinWidth must be >= 1 \n";
       return 1;
     }
     return 0;
@@ -172,18 +200,27 @@ int main( int32_t argc, char* argv[] ) {
       params.numPoints_ = viewpoints.size();
     }
 
-    std::vector<std::vector<float>> impScores = std::vector<std::vector<float>>(viewpoints.size());
+    if ( params.downscaleFactor_ > 1.0f ) {
+      for ( auto& viewpoint : viewpoints ) {
+        viewpoint = makeDownscaledViewpoint( viewpoint, params.downscaleFactor_, params.downscaleMinWidth_ );
+      }
+    }
+
+    if ( params.verbose_ ) {
+      printf( "Using downscaleFactor=%.3f, minimumWidth=%d\n",
+          params.downscaleFactor_, params.downscaleMinWidth_ );
+    }
+
+    std::vector<std::vector<float>> impScores = std::vector<std::vector<float>>( viewpoints.size() );
 
     for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
       impScores[viewpointIndex] = std::vector<float>(pc.size());
     }
 // Rendering
+    timer.tic( "Rasterize" );
 #pragma omp parallel for
     for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
-      auto  imageFloat = Image<float, 3>( params.width_, params.height_ );
-      auto  imageOcm   = Image<uint8_t, 1>( params.width_, params.height_ );
       auto& viewpoint  = viewpoints[viewpointIndex];
-      Image<uint8_t, 1> imageOcmUnion;
       if ( params.verbose_ ) {
         printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
                 viewpoints.size() );
@@ -194,10 +231,9 @@ int main( int32_t argc, char* argv[] ) {
         fflush( stdout );
       }
       // Rasterize
-      timer.tic( "Rasterize" );
-      rasterizer.render( pc, viewpoint, imageFloat, imageOcm, &impScores[viewpointIndex] );
-      timer.toc( "Rasterize", params.verbose_ );
+      rasterizer.computeTransmittanceSums( pc, viewpoint, impScores[viewpointIndex] );
     }
+    timer.toc( "Rasterize", params.verbose_ );
     saveImportanceScores(impScores, params.impScoresPath_, frameIndex > 0);
   }
   if ( params.verbose_ ) timer.trace();

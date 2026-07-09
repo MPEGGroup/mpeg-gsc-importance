@@ -63,34 +63,41 @@ template <typename T, int32_t N>
 void Rasterizer::render( const Pointcloud&  pc,
                          const Viewpoint&   viewpoint,
                          Image<T, N>&       image,
-                         Image<uint8_t, 1>& ocm,
-                         std::vector<float>* transSums ) {
+                         Image<uint8_t, 1>& ocm ) {
 #if defined( USE_GLFW )
   if ( useSoftware_ )
-    rasterizerSoftware_->render( pc, viewpoint, image, ocm, transSums );
+    rasterizerSoftware_->render( pc, viewpoint, image, ocm );
   else
-
     rasterizerHardware_->render( pc, viewpoint, image, ocm );
 #else
-  rasterizerSoftware_->render( pc, viewpoint, image, ocm, transSums );
+  rasterizerSoftware_->render( pc, viewpoint, image, ocm );
+#endif
+}
+
+void Rasterizer::computeTransmittanceSums( const Pointcloud&  pc,
+                                           const Viewpoint&   viewpoint,
+                                           std::vector<float>& transSums ) {
+#if defined( USE_GLFW )
+  if ( useSoftware_ ) {
+    rasterizerSoftware_->computeTransmittanceSums( pc, viewpoint, transSums );
+  } else {
+    printf( "Error: computeTransmittanceSums is only supported by the software rasterizer.\n" );
+    std::abort();
+  }
+#else
+  rasterizerSoftware_->computeTransmittanceSums( pc, viewpoint, transSums );
 #endif
 }
 
 template void Rasterizer::render<uint8_t>( Pointcloud const&,
                                            const Viewpoint&,
                                            Image<uint8_t, 3>&,
-                                           Image<uint8_t, 1>&,
-                                           std::vector<float>*
-);
+                                           Image<uint8_t, 1>& );
 template void Rasterizer::render<uint16_t>( Pointcloud const&,
                                             const Viewpoint&,
                                             Image<uint16_t, 3>&,
-                                            Image<uint8_t, 1>&,
-                                            std::vector<float>*
-);
+                                            Image<uint8_t, 1>& );
 template void Rasterizer::render<float>( Pointcloud const&,
                                          const Viewpoint&,
                                          Image<float, 3>&,
-                                         Image<uint8_t, 1>&,
-                                         std::vector<float>* 
-);
+                                         Image<uint8_t, 1>& );
