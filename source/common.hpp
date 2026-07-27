@@ -39,37 +39,29 @@
 #define _USE_MATH_DEFINES
 #include <algorithm>
 #include <array>
-#include <cassert>
-#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <deque>
-#include <filesystem>
 #include <fstream>
-#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <istream>
-#include <map>
-#include <memory>
-#include <set>
-#include <utility>
+#include <limits>
+#include <list>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
-#include <sys/types.h>
+#include <tuple>
+#include <utility>
 #include <vector>
-#include <numeric>
-#include <variant>
 
 #ifdef WIN32
 #include <windows.h>
-#else
-#include <sys/dir.h>
 #endif
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -87,60 +79,11 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
-#if defined( USE_GLFW )
-#include <glad/glad.h>
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-
-static void getBuffer( GLuint uiBuffer, std::vector<uint32_t>& vec, size_t size ) {
-  GLenum error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error code: 0x%x before getBuffer\n", error );
-    fflush( stdout );
-  }
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
-  void* rawKey = glMapBufferRange( GL_ELEMENT_ARRAY_BUFFER, 0, sizeof( uint32_t ) * size, GL_MAP_READ_BIT );
-  if ( !rawKey ) {
-    printf( "Error: glMapBufferRange failed, OpenGL error: 0x%x\n", glGetError() );
-    fflush( stdout );
-  } else {
-    if ( vec.size() < size ) { vec.resize( size ); }
-    memcpy( vec.data(), rawKey, sizeof( uint32_t ) * size );
-  }
-  if ( !glUnmapBuffer( GL_ELEMENT_ARRAY_BUFFER ) ) {
-    printf( "Error: glUnmapBuffer failed, OpenGL error: 0x%x\n", glGetError() );
-    fflush( stdout );
-  }
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error code: 0x%x after getBuffer\n", error );
-    fflush( stdout );
-  }
-}
-
-static void setBuffer( GLuint uiBuffer, const std::vector<uint32_t>& vec ) {
-  GLenum error;
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, uiBuffer );
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error: Failed to bind buffer 0x%x\n", error );
-    return;
-  }
-  glBufferSubData( GL_ELEMENT_ARRAY_BUFFER, 0, vec.size() * sizeof( uint32_t ), vec.data() );
-  error = glGetError();
-  if ( error != GL_NO_ERROR ) {
-    printf( "OpenGL error: glBufferSubData failed with code 0x%x\n", error );
-    return;
-  }
-  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-}
-#endif
-
 #ifdef WIN32
 #define snprintf _snprintf
 #endif
 template <typename... Args>
-std::string stringFormat( const char* pFormat, Args... args ) {
+std::string stringFormat( const char *pFormat, Args... args ) {
   size_t      iSize = snprintf( nullptr, 0, pFormat, args... );
   std::string pString;
   pString.reserve( iSize + 1 );
@@ -149,12 +92,12 @@ std::string stringFormat( const char* pFormat, Args... args ) {
   return pString;
 }
 
-static inline bool exist( const std::string& pString ) {
+static inline bool exist( const std::string &pString ) {
   struct stat buffer;
   return ( stat( pString.c_str(), &buffer ) == 0 );
 }
 
-static bool dirExists( const std::string& pString ) {
+static bool dirExists( const std::string &pString ) {
   struct stat sb;
   if ( stat( pString.c_str(), &sb ) == 0 ) { return true; }
   return false;
@@ -166,12 +109,12 @@ static char getSeparator() { return '/'; }
 static char getSeparator() { return '\\'; }
 #endif
 
-static char getSeparator( const std::string& eFilename ) {
-  auto pos = ( std::min )( eFilename.find_last_of( '/' ), eFilename.find_last_of( '\\' ) );
+static char getSeparator( const std::string &eFilename ) {
+  auto pos = (std::min)( eFilename.find_last_of( '/' ), eFilename.find_last_of( '\\' ) );
   return pos != std::string::npos ? eFilename[pos] : getSeparator();
 }
 
-static std::string createFilename( const std::string& pFilename, int32_t iFrameIndex ) {
+static std::string createFilename( const std::string &pFilename, int32_t iFrameIndex ) {
   std::string sFilename = stringFormat( pFilename.c_str(), iFrameIndex );
 #ifdef MSVC
   char pNewName[512];
@@ -181,89 +124,19 @@ static std::string createFilename( const std::string& pFilename, int32_t iFrameI
   return sFilename;
 }
 
-static bool createDirectory( const std::string& eFilename ) {
-  try {
-    std::filesystem::path p( eFilename );
-    std::filesystem::path dir = p.parent_path();
-    if ( dir.empty() ) { return true; }
-    if ( !std::filesystem::exists( dir ) ) { return std::filesystem::create_directories( dir ); }
-    return true;
-  } catch ( const std::filesystem::filesystem_error& e ) {
-    std::cerr << "Error: " << e.what() << std::endl;
-    return false;
-  }
-}
+typedef float ( *CastFunction )( uint8_t *pPointer );
 
-static std::string getExtension( const std::string& eFilename ) {
-  auto position = eFilename.find_last_of( '.' );
-  if ( position != std::string::npos ) {
-    return eFilename.substr( position + 1 );
-  } else {
-    return std::string( "" );
-  }
-}
+static inline float castUChar( uint8_t *pPointer ) { return (float)( *( (uint8_t *)pPointer ) ); }
+static inline float castChar( uint8_t *pPointer ) { return (float)( *( (char *)pPointer ) ); }
+static inline float castUShort( uint8_t *pPointer ) { return (float)( *( (uint16_t *)pPointer ) ); }
+static inline float castShort( uint8_t *pPointer ) { return (float)( *( (short *)pPointer ) ); }
+static inline float castUInt( uint8_t *pPointer ) { return (float)( *( (uint32_t *)pPointer ) ); }
+static inline float castInt( uint8_t *pPointer ) { return (float)( *( (int32_t *)pPointer ) ); }
+static inline float castFloat( uint8_t *pPointer ) { return (float)( *( (float *)pPointer ) ); }
+static inline float castDouble( uint8_t *pPointer ) { return (float)( *( (double *)pPointer ) ); }
+static inline float castZero( uint8_t * ) { return 0; }
 
-static std::string getRemoveExtension( const std::string& eFilename ) {
-  auto position = eFilename.find_last_of( '.' );
-  if ( position != std::string::npos ) { return eFilename.substr( 0, position ); }
-  return eFilename;
-}
-
-static std::string getDirectory( const std::string& string ) {
-  auto position = string.find_last_of( getSeparator( string ) );
-  if ( position != std::string::npos ) { return string.substr( 0, position ); }
-  return string;
-}
-
-static std::string getBasename( const std::string& string ) {
-  auto position = string.find_last_of( getSeparator( string ) );
-  if ( position != std::string::npos ) { return string.substr( position + 1, string.length() ); }
-  return string;
-}
-
-static std::string getLabel( const std::string& path ) {
-  const auto parent = getBasename( getDirectory( path ) );
-  return parent.empty() ? getBasename( path ) : parent + getSeparator( path ) + getBasename( path );
-}
-
-static std::string formatCode( const std::string& eCode ) {
-  std::istringstream shaderStream( eCode );
-  std::string        line;
-  std::string        output;
-  int32_t            lineIndex = 1;
-  while ( std::getline( shaderStream, line ) ) output += stringFormat( "%4d: %s \n", lineIndex++, line.c_str() );
-  return output;
-}
-
-static void logMat4( const std::string& name, const glm::mat4& mat ) {
-  printf( "glm::mat4 %-8s( %12.8f, %12.8f, %12.8f, %12.8f, \n", name.c_str(), mat[0][0], mat[0][1], mat[0][2],
-          mat[0][3] );
-  printf( "                    %12.8f, %12.8f, %12.8f, %12.8f, \n", mat[1][0], mat[1][1], mat[1][2], mat[1][3] );
-  printf( "                    %12.8f, %12.8f, %12.8f, %12.8f, \n", mat[2][0], mat[2][1], mat[2][2], mat[2][3] );
-  printf( "                    %12.8f, %12.8f, %12.8f, %12.8f );\n", mat[3][0], mat[3][1], mat[3][2], mat[3][3] );
-}
-
-static void logVec3( const std::string& name, const glm::vec3& vec ) {
-  printf( "glm::vec3 %-8s( %12.8f, %12.8f, %12.8f ); \n", name.c_str(), vec[0], vec[1], vec[2] );
-}
-
-static void logVec2( const std::string& name, const glm::vec2& vec ) {
-  printf( "glm::vec2 %-8s( %12.8f, %12.8f ); \n", name.c_str(), vec[0], vec[1] );
-}
-
-typedef float ( *CastFunction )( uint8_t* pPointer );
-
-static inline float castUChar( uint8_t* pPointer ) { return (float)( *( (uint8_t*)pPointer ) ); }
-static inline float castChar( uint8_t* pPointer ) { return (float)( *( (char*)pPointer ) ); }
-static inline float castUShort( uint8_t* pPointer ) { return (float)( *( (uint16_t*)pPointer ) ); }
-static inline float castShort( uint8_t* pPointer ) { return (float)( *( (short*)pPointer ) ); }
-static inline float castUInt( uint8_t* pPointer ) { return (float)( *( (uint32_t*)pPointer ) ); }
-static inline float castInt( uint8_t* pPointer ) { return (float)( *( (int32_t*)pPointer ) ); }
-static inline float castFloat( uint8_t* pPointer ) { return (float)( *( (float*)pPointer ) ); }
-static inline float castDouble( uint8_t* pPointer ) { return (float)( *( (double*)pPointer ) ); }
-static inline float castZero( uint8_t* ) { return 0; }
-
-static void getSize( const std::string& pFormat, int32_t& iSize, CastFunction& eCastFunction ) {
+static void getSize( const std::string &pFormat, int32_t &iSize, CastFunction &eCastFunction ) {
   // clang-format off
   if      ( pFormat == "float"   ) { iSize = 4; eCastFunction = castFloat;   } 
   else if ( pFormat == "uchar"   ) { iSize = 1; eCastFunction = castUChar;   } 
@@ -284,11 +157,3 @@ static void getSize( const std::string& pFormat, int32_t& iSize, CastFunction& e
   else {    iSize         = 0;    eCastFunction = castZero;  }
   // clang-format on
 }
-
-#define SHADER_VERSION_MAJOR 4
-#define SHADER_VERSION_MINOR 6
-
-#define SHADER_VERSION ( ( SHADER_VERSION_MAJOR * 100 ) + ( SHADER_VERSION_MINOR * 10 ) )
-
-#define SHADER( shader ) "#version " + std::to_string( SHADER_VERSION ) + "\n" #shader
-#define SHADERR( shader ) R"(#version )" + std::to_string( SHADER_VERSION ) + shader

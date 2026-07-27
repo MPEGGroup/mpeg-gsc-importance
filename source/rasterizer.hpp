@@ -38,26 +38,9 @@
 #include "common.hpp"
 
 class Pointcloud;
-template <typename T, int N>
-class Image;
-class RasterizerSoftware;
-class RasterizerHardware;
 class Viewpoint;
 
 class Rasterizer {
  public:
-  Rasterizer( bool useSoftware );
-  ~Rasterizer();
-
-  template <typename T, int N>
-  void render( const Pointcloud& pc, const Viewpoint& viewpoint, Image<T, N>& image, Image<uint8_t, 1>& ocm );
-
-  void computeTransmittanceSums( const Pointcloud& pc, const Viewpoint& viewpoint, std::vector<float>& transSums );
-
- private:
-  bool                                useSoftware_;
-  std::unique_ptr<RasterizerSoftware> rasterizerSoftware_;
-#if defined( USE_GLFW )
-  std::unique_ptr<RasterizerHardware> rasterizerHardware_;
-#endif
+  void computeTransmittanceSums( const Pointcloud &pc, const Viewpoint &viewpoint, std::vector<float> &transSums );
 };

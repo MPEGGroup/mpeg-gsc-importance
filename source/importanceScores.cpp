@@ -35,45 +35,44 @@
  */
 
 #include "common.hpp"
-#include "image.hpp"
 #include "pointcloud.hpp"
 #include "rasterizer.hpp"
 #include "viewpoints.hpp"
 #include "program-options-lite/program_options_lite.h"
 #include "version.hpp"
-#include "metric.hpp"
 #include "timer.hpp"
 
 #if defined( USE_OPENMP )
 #include <omp.h>
 #endif
 
-Viewpoint makeDownscaledViewpoint( const Viewpoint& viewpoint, float downscaleFactor, int32_t minimumWidth ) {
+Viewpoint makeDownscaledViewpoint( const Viewpoint &viewpoint, float downscaleFactor, int32_t minimumWidth ) {
   int32_t originalWidth  = viewpoint.originalWidth();
   int32_t originalHeight = viewpoint.originalHeight();
   if ( originalWidth <= 0 || originalHeight <= 0 ) { return viewpoint; }
 
-  int32_t downscaledWidth = static_cast<int32_t>( std::round( static_cast<double>( originalWidth ) / downscaleFactor ) );
-  int32_t newWidth        = std::max( minimumWidth, std::max( downscaledWidth, 1 ) );
-  float   ratio           = static_cast<float>( newWidth ) / static_cast<float>( originalWidth );
-  int32_t newHeight       = std::max( static_cast<int32_t>( std::round( static_cast<double>( originalHeight ) * ratio ) ), 1 );
-  glm::vec2 newFocal      = viewpoint.focal() * ratio;
+  int32_t downscaledWidth =
+      static_cast<int32_t>( std::round( static_cast<double>( originalWidth ) / downscaleFactor ) );
+  int32_t newWidth = std::max( minimumWidth, std::max( downscaledWidth, 1 ) );
+  float   ratio    = static_cast<float>( newWidth ) / static_cast<float>( originalWidth );
+  int32_t newHeight =
+      std::max( static_cast<int32_t>( std::round( static_cast<double>( originalHeight ) * ratio ) ), 1 );
+  glm::vec2 newFocal = viewpoint.focal() * ratio;
 
   Viewpoint scaled;
   scaled.set( viewpoint.pos(), viewpoint.view(), viewpoint.up(), newFocal, newWidth, newHeight );
   return scaled;
 }
 
+void saveImportanceScores( const std::vector<std::vector<float>> &impScores,
+                           const std::string                     &filePath,
+                           bool                                   append ) {
+  std::ofstream out( filePath, append ? std::ios::app : std::ios::out );
 
-void saveImportanceScores(const std::vector<std::vector<float>>& impScores, const std::string& filePath, bool append){
-  std::ofstream out(filePath, append ? std::ios::app : std::ios::out);
-
-  out << std::setprecision(std::numeric_limits<float>::max_digits10);
-  for (size_t i = 0; i < impScores[0].size(); i++){
+  out << std::setprecision( std::numeric_limits<float>::max_digits10 );
+  for ( size_t i = 0; i < impScores[0].size(); i++ ) {
     float acc = 0.0f;
-    for (size_t viewIndex = 0; viewIndex < impScores.size(); viewIndex++){
-      acc += impScores[viewIndex][i];
-    }
+    for ( size_t viewIndex = 0; viewIndex < impScores.size(); viewIndex++ ) { acc += impScores[viewIndex][i]; }
     out << acc << '\n';
   }
 
@@ -90,15 +89,12 @@ struct Parameters {
   std::string viewpointPath_     = "";
   int32_t     startFrame_        = 0;
   int32_t     frameCount_        = 1;
-  int32_t     numPoints_         = 16;
-  int32_t     width_             = 1024;
-  int32_t     height_            = 768;
   int32_t     numThreads_        = 0;
   float       downscaleFactor_   = 1.0f;
   int32_t     downscaleMinWidth_ = 1920;
-  std::string impScoresPath_      = "";
+  std::string impScoresPath_     = "";
 
-  bool parse( int32_t argc, char* argv[] ) {
+  bool parse( int32_t argc, char *argv[] ) {
     namespace po = df::program_options_lite;
     po::Options opts;
     /* clang-format off */
@@ -114,8 +110,6 @@ struct Parameters {
       (po::Section("Sequence information"))       
         ("i,startFrame",      startFrame_,        startFrame_,        "First frame number")
         ("f,frameCount",      frameCount_,        frameCount_,        "Number of frames")
-        ("width",             width_,             width_,             "Width of the generated images")
-        ("height",            height_,            height_,            "Height of the generated images")
         ("downscaleFactor",   downscaleFactor_,   downscaleFactor_,   "Downscale factor applied to camera resolution")
         ("downscaleMinWidth", downscaleMinWidth_, downscaleMinWidth_, "Minimum width after downscaling; height inferred from aspect ratio")
       
@@ -127,8 +121,8 @@ struct Parameters {
 
     /* clang-format on */
     po::setDefaults( opts );
-    po::ErrorReporter             err;
-    const std::list<const char*>& argv_unhandled = po::scanArgv( opts, argc, (const char**)argv, err );
+    po::ErrorReporter              err;
+    const std::list<const char *> &argv_unhandled = po::scanArgv( opts, argc, (const char **)argv, err );
     if ( argc == 1 || help_ || sourcePath_.empty() || impScoresPath_.empty() || argv_unhandled.size() != 0 ||
          err.is_errored ) {
       std::cout << "\nusage: " << argv[0] << " [arguments...] \n";
@@ -136,7 +130,7 @@ struct Parameters {
       std::cout << "\n";
       if ( sourcePath_.empty() ) err.error() << "Undefined input path \n";
       if ( impScoresPath_.empty() ) printf( "Warning: Importance Score output file is not defined. \n" );
-      for ( const auto* const arg : argv_unhandled ) { err.warn() << "Unhandled argument ignored: " << arg << '\n'; }
+      for ( const auto *const arg : argv_unhandled ) { err.warn() << "Unhandled argument ignored: " << arg << '\n'; }
       if ( err.is_errored ) err.error() << "Unhandled argument \n";
       return 1;
     }
@@ -152,24 +146,23 @@ struct Parameters {
   }
 };
 
-
-int main( int32_t argc, char* argv[] ) {
+int main( int32_t argc, char *argv[] ) {
   printf( "MPEG GSC metric version %s \n", ::gscm::version );
   printf( "Computing importance scores from views\n" );
   fflush( stdout );
 
   Parameters params;
   if ( params.parse( argc, argv ) ) { return 1; }
-  auto start = std::chrono::high_resolution_clock::now();
-  Rasterizer        rasterizer( true );
-  Timer             timer;
+  auto       start = std::chrono::high_resolution_clock::now();
+  Rasterizer rasterizer;
+  Timer      timer;
 
 #if defined( USE_OPENMP )
-  omp_set_dynamic(0);
+  omp_set_dynamic( 0 );
   if ( params.numThreads_ > 0 ) {
     omp_set_num_threads( params.numThreads_ );
   } else {
-    omp_set_num_threads(omp_get_num_procs());
+    omp_set_num_threads( omp_get_num_procs() );
   }
 #endif
 
@@ -179,48 +172,45 @@ int main( int32_t argc, char* argv[] ) {
     timer.tic( "Read" );
     if ( !pc.read( params.sourcePath_, params.startFrame_ + frameIndex, params.verbose_ ) ) return 1;
     timer.toc( "Read", params.verbose_ );
-    if ( params.verbose_ )
-      pc.trace();
+    if ( params.verbose_ ) pc.trace();
 
     // Create viewpoint list
     Viewpoints viewpoints;
     if ( !params.viewpointPath_.empty() ) { viewpoints.read( params.viewpointPath_ ); }
     if ( viewpoints.size() == 0 ) {
-      auto& cameraPosition = pc.getCameraPosition();
-      if ( cameraPosition.size() == 0) {
-        printf( "Error: camera position is not correclty defined in the ply files \n" );
+      auto &cameraPosition = pc.getCameraPosition();
+      if ( cameraPosition.size() == 0 ) {
+        printf( "Error: camera position is not correctly defined in the ply files \n" );
         return 1;
       }
       viewpoints.resize( cameraPosition.size() );
       for ( size_t i = 0; i < cameraPosition.size(); i++ ) {
-        const auto& el = cameraPosition[i];
+        const auto &el = cameraPosition[i];
         viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_ );
         if ( params.verbose_ ) el.log();
       }
-      params.numPoints_ = viewpoints.size();
     }
 
     if ( params.downscaleFactor_ > 1.0f ) {
-      for ( auto& viewpoint : viewpoints ) {
+      for ( auto &viewpoint : viewpoints ) {
         viewpoint = makeDownscaledViewpoint( viewpoint, params.downscaleFactor_, params.downscaleMinWidth_ );
       }
     }
 
     if ( params.verbose_ ) {
-      printf( "Using downscaleFactor=%.3f, minimumWidth=%d\n",
-          params.downscaleFactor_, params.downscaleMinWidth_ );
+      printf( "Using downscaleFactor=%.3f, minimumWidth=%d\n", params.downscaleFactor_, params.downscaleMinWidth_ );
     }
 
     std::vector<std::vector<float>> impScores = std::vector<std::vector<float>>( viewpoints.size() );
 
     for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
-      impScores[viewpointIndex] = std::vector<float>(pc.size());
+      impScores[viewpointIndex] = std::vector<float>( pc.size() );
     }
-// Rendering
+    // Rendering
     timer.tic( "Rasterize" );
 #pragma omp parallel for
     for ( int32_t viewpointIndex = 0; viewpointIndex < (int32_t)viewpoints.size(); viewpointIndex++ ) {
-      auto& viewpoint  = viewpoints[viewpointIndex];
+      auto &viewpoint = viewpoints[viewpointIndex];
       if ( params.verbose_ ) {
         printf( "Frame %3d / %3d: viewpoints %3d / %3zu ", frameIndex, params.frameCount_, viewpointIndex,
                 viewpoints.size() );
@@ -234,7 +224,7 @@ int main( int32_t argc, char* argv[] ) {
       rasterizer.computeTransmittanceSums( pc, viewpoint, impScores[viewpointIndex] );
     }
     timer.toc( "Rasterize", params.verbose_ );
-    saveImportanceScores(impScores, params.impScoresPath_, frameIndex > 0);
+    saveImportanceScores( impScores, params.impScoresPath_, frameIndex > 0 );
   }
   if ( params.verbose_ ) timer.trace();
   std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;

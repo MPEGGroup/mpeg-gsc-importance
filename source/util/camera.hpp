@@ -38,40 +38,18 @@
 
 class Camera {
  public:
-  Camera( int width = 0, int height = 0, float fov = glm::radians( 45.f ) ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ), width_(width), height_(height) {
-    initialize( width, height );
-  }
-  Camera( int width, int height, float fov, const glm::vec3 ePos, const glm::vec3 eCenter, const glm::vec3 eUp ) :
-      rotation_( 1, 0, 0, 0 ), center_( 0, 0, 0 ), dist_( 1.0f ), boxSize_( 1.0f ), fov_( fov ), width_(width), height_(height) {
-    initialize( width, height );
-    setLookAt( ePos, eCenter, eUp );
-  }
+  Camera() = default;
 
-  void initialize( int width, int height ) { 
-    width_ = width;
-    height_ = height;
-    ratio_ = (float)width / (float)height; 
-  }
+  void initialize( int width, int height ) { ratio_ = static_cast<float>( width ) / static_cast<float>( height ); }
 
-  void create( const float fBoxSize, const float fFov ) {
+  void create( float boxSize, float fov ) {
     rotation_ = glm::quat( 1, 0, 0, 0 );
-    center_   = glm::vec3( fBoxSize / 2.f, fBoxSize / 2.f, fBoxSize / 2.f );
-    dist_     = fBoxSize;
-    boxSize_  = fBoxSize;
-    fov_      = fFov;
+    center_   = glm::vec3( boxSize / 2.f );
+    dist_     = boxSize;
+    fov_      = fov;
   }
 
-  void setFov(float fov) {
-    fov_ = fov;
-  }
-
-  glm::vec3 center() { return center_; }
-  glm::vec3 getPosition() const { return glm::toMat3( rotation_ ) * glm::vec3( 0, 0, dist_ ) + center_; }
-  int getWidth() const { return width_; }
-  int getHeight() const { return height_; }
-
-  glm::mat4 viewMat() {
+  glm::mat4 viewMat() const {
     glm::mat3 mat = glm::toMat3( rotation_ );
     return glm::lookAt( mat * glm::vec3( 0, 0, dist_ ) + center_, center_, mat * glm::vec3( 0, 1, 0 ) );
   }
@@ -79,74 +57,20 @@ class Camera {
 
   glm::mat4 projMat() const { return glm::perspective( fov_, ratio_, nearFar_.x, nearFar_.y ); }
 
-  std::tuple<glm::vec3, glm::vec3, glm::vec3> getLookAt() {
-    auto mat = glm::toMat3( rotation_ );
-    return std::make_tuple( mat * glm::vec3( 0, 0, dist_ ) + center_, center_, mat * glm::vec3( 0, 1, 0 ) );
-  }
-
-  void setLookAt( const glm::vec3 ePos, const glm::vec3 eCenter, const glm::vec3 eUp ) {
-    glm::vec3 eZ = glm::normalize( ePos - eCenter );
-    glm::vec3 eX = glm::normalize( glm::cross( eUp, eZ ) );
-    glm::vec3 eY = glm::normalize( glm::cross( eZ, eX ) );
-    rotation_    = glm::toQuat( glm::mat3( eX, eY, eZ ) );
-    center_      = eCenter;
-    dist_        = glm::length( ePos - eCenter );
-  }
-
-  glm::vec3& projectToSphere( const float& fRadius, glm::vec3& ePoint ) const {
-    const float fD = ePoint[0] * ePoint[0] + ePoint[1] * ePoint[1], fR = fRadius * fRadius;
-    if ( fD < fR ) {
-      ePoint[2] = std::sqrt( fR - fD );
-    } else {
-      ePoint[2] = 0;
-      ePoint *= fRadius / glm::length( ePoint );
-    }
-    return ePoint;
-  }
-
-  glm::quat getRotate( const double fX0, const double fY0, const double fX1, const double fY1 ) {
-    glm::quat ret( 1, 0, 0, 0 );
-    glm::vec3 eP0( static_cast<float>( fX0 ), static_cast<float>( fY0 ), 0 );
-    glm::vec3 eP1( static_cast<float>( fX1 ), static_cast<float>( fY1 ), 0 );
-    if ( glm::length( eP0 - eP1 ) >= 1.0e-16f ) {
-      glm::vec3 eV0 = glm::normalize( projectToSphere( 0.9f, eP1 ) );
-      glm::vec3 eV1 = glm::normalize( projectToSphere( 0.9f, eP0 ) );
-      float     fC  = glm::dot( eV1, eV0 );
-      if ( fC > -1 ) {
-        float fS = std::sqrt( ( 1 + fC ) * 2 );
-        eV0      = glm::cross( eV0, eV1 ) * ( 1.f / fS );
-        ret      = glm::quat( fS * 0.5f, eV0[0], eV0[1], eV0[2] );
-      }
-    }
-    return ret;
-  }
-
-  void rotate( const double fX0, const double fY0, const double fX1, const double fY1 ) {
-    rotation_ *= getRotate( fX0, fY0, fX1, fY1 );
-    std::tuple<glm::vec3, glm::vec3, glm::vec3> value = getLookAt();
-    setLookAt( std::get<0>( value ), std::get<1>( value ), std::get<2>( value ) );
-  }
-
-  void translate( float x, float y, float z ) { center_ += glm::toMat3( rotation_ ) * glm::vec3( x, y, z ); }
-
-  void zoom( float fZoom ) {
-    if ( fZoom > 0 ) {
-      dist_ *= 1.f + fZoom / 1500.f;
-      if ( dist_ > 40.f * boxSize_ ) { dist_ = 40.f * boxSize_; }
-    } else {
-      dist_ /= 1.f - fZoom / 1500.f;
-      if ( dist_ < 0.05f * boxSize_ ) { dist_ = 0.05f * boxSize_; }
-    }
+  void setLookAt( glm::vec3 position, glm::vec3 center, glm::vec3 up ) {
+    glm::vec3 zAxis = glm::normalize( position - center );
+    glm::vec3 xAxis = glm::normalize( glm::cross( up, zAxis ) );
+    glm::vec3 yAxis = glm::normalize( glm::cross( zAxis, xAxis ) );
+    rotation_       = glm::toQuat( glm::mat3( xAxis, yAxis, zAxis ) );
+    center_         = center;
+    dist_           = glm::length( position - center );
   }
 
  private:
-  glm::quat rotation_;
-  glm::vec3 center_;
-  float     dist_;
-  float     boxSize_;
-  float     ratio_;
-  float     fov_     = glm::radians( 45.0f );
-  glm::vec2 nearFar_ = { 0.010000f, 10000000000.0f };
-  int       width_   = 0;
-  int       height_  = 0;
+  glm::quat rotation_ = glm::quat( 1, 0, 0, 0 );
+  glm::vec3 center_   = glm::vec3( 0 );
+  float     dist_     = 1.0f;
+  float     ratio_    = 1.0f;
+  float     fov_      = glm::radians( 45.0f );
+  glm::vec2 nearFar_  = { 0.010000f, 10000000000.0f };
 };

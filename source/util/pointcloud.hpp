@@ -62,10 +62,9 @@ struct CameraPosition {
         orientation_.w, focal_.x, focal_.y, width_, height_, name_.c_str() );
   }
 
-  void updateView( glm::vec3& eEye, glm::vec3& eCenter, glm::vec3& eUp ) const {
+  void updateView( glm::vec3 &eEye, glm::vec3 &eCenter, glm::vec3 &eUp ) const {
     glm::mat3 rotation = glm::transpose( glm::mat3_cast( orientation_ ) );
     glm::vec3 forward  = rotation * glm::vec3( 0, 0, 1 );
-    glm::vec3 right    = rotation * glm::vec3( 1, 0, 0 );
     glm::vec3 up       = rotation * glm::vec3( 0, -1, 0 );
     eEye               = position_;
     eCenter            = position_ + forward;
@@ -87,62 +86,32 @@ struct CameraPosition {
     updateView( eEye, eCenter, eUp );
     return eUp;
   }
-  
-  bool operator==( const CameraPosition& other ) const {
-    return index_ == other.index_ && cameraId_ == other.cameraId_ && position_ == other.position_ &&
-           orientation_ == other.orientation_ && focal_ == other.focal_ && 
-           width_ == other.width_ && height_ == other.height_ &&   
-           name_ == other.name_;
-  }
-  
-  bool operator!=( const CameraPosition& other ) const { return !( *this == other ); }
-  
-  CameraPosition& operator=( const CameraPosition& other ) {
-    if ( this != &other ) {
-      index_       = other.index_;
-      cameraId_    = other.cameraId_;
-      position_    = other.position_;
-      orientation_ = other.orientation_;
-      focal_       = other.focal_;
-      width_       = other.width_;   
-      height_      = other.height_;
-      name_        = other.name_;
-    }
-    return *this;
-  }
 };
-
-static void traceSH( const GaussianData& gs ) {
-  for ( size_t j = 0; j < 16; j++ )
-    printf( "SH[%zu] = %12.6f %12.6f %12.6f %12.6f ", j, gs.sh_[j][0], gs.sh_[j][1], gs.sh_[j][2], gs.sh_[j][3] );
-  printf( "\n" );
-}
 
 class Pointcloud {
  public:
   Pointcloud() {}
-  Pointcloud( const std::string& path, int32_t frameIndex ) { read( path, frameIndex ); }
+  Pointcloud( const std::string &path, int32_t frameIndex ) { read( path, frameIndex ); }
   ~Pointcloud() { reset(); }
 
   auto                       begin() { return gaussianData_.begin(); }
   auto                       end() { return gaussianData_.end(); }
   auto                       begin() const { return gaussianData_.cbegin(); }
   auto                       end() const { return gaussianData_.cend(); }
-  inline GaussianData&       operator[]( int32_t index ) { return gaussianData_[index]; }
-  inline const GaussianData& operator[]( int32_t index ) const { return gaussianData_[index]; }
+  inline GaussianData       &operator[]( int32_t index ) { return gaussianData_[index]; }
+  inline const GaussianData &operator[]( int32_t index ) const { return gaussianData_[index]; }
   inline int32_t             size() const { return (int32_t)gaussianData_.size(); }
-  inline void*               data() const { return (void*)gaussianData_.data(); }
   inline void                reset() { gaussianData_.clear(); }
-  inline const auto&         getCameraPosition() const { return cameraPosition_; }
-  inline auto&               getCameraPosition() { return cameraPosition_; }
+  inline const auto         &getCameraPosition() const { return cameraPosition_; }
+  inline auto               &getCameraPosition() { return cameraPosition_; }
 
-  bool read( const std::string& path, int32_t frameIndex, bool verbose = false ) {
+  bool read( const std::string &path, int32_t frameIndex, bool verbose = false ) {
     auto filename = createFilename( path, frameIndex );
     if ( !exist( filename ) ) {
       printf( "Error: The input file does not exist: \"%s\"\n", filename.c_str() );
       return false;
     }
-    std::string   line, s1, s2;
+    std::string   line;
     std::ifstream inputPly;
     if ( verbose ) {
       printf( "Pointcloud reader: Reading %s \n", filename.c_str() );
@@ -155,7 +124,7 @@ class Pointcloud {
     }
     bool bFormatError = false, bAscii = false, bLittleEndian = false, bInVertexElements = false,
          bInHeaderElements = false;
-    int iNumPoints = 0, iSize = 0, iOrder = 0, iIndex = 0, iNumFaces = 0, iNumHeader = 0, iSizeHeader = 0;
+    int  iNumPoints = 0, iSize = 0, iOrder = 0, iIndex = 0, iNumFaces = 0, iNumHeader = 0, iSizeHeader = 0;
     const std::vector<std::string> pProperty = {
         "x",         "y",         "z",         "nx",        "ny",        "nz",        "f_dc_0",    "f_dc_1",
         "f_dc_2",    "f_rest_0",  "f_rest_1",  "f_rest_2",  "f_rest_3",  "f_rest_4",  "f_rest_5",  "f_rest_6",
@@ -167,7 +136,6 @@ class Pointcloud {
         "scale_1",   "scale_2",   "rot_0",     "rot_1",     "rot_2",     "rot_3",
     };
     std::vector<int>          pSize( pProperty.size() + 1, 0 );
-    std::vector<int>          pOrder( pProperty.size(), -1 );
     std::vector<int>          pIndex( pProperty.size(), 0 );
     std::vector<CastFunction> pCast( pProperty.size() + 1, castZero );
     getline( inputPly, line );
@@ -233,7 +201,6 @@ class Pointcloud {
           for ( size_t i = 0; i < pProperty.size() && !find; i++ ) {
             if ( eT == pProperty[i] ) {
               pSize[i]  = iSize;
-              pOrder[i] = iOrder;
               pIndex[i] = iIndex;
               pCast[i]  = eCast;
               find      = true;
@@ -293,8 +260,8 @@ class Pointcloud {
       std::array<float, 48> pSh;
       if ( iNumHeader > 0 ) { inputPly.ignore( iNumHeader * iSizeHeader ); }
       for ( size_t i = 0; i < static_cast<size_t>( iNumPoints ); i++ ) {
-        auto& dst = gaussianData_[i];
-        inputPly.read( reinterpret_cast<char*>( pC.data() ), iIndex * sizeof( unsigned char ) );
+        auto &dst = gaussianData_[i];
+        inputPly.read( reinterpret_cast<char *>( pC.data() ), iIndex * sizeof( unsigned char ) );
 
         int k       = 0;
         dst.xyz_[0] = pCast[k + 0]( pC.data() + pIndex[k + 0] );  // x
@@ -341,7 +308,7 @@ class Pointcloud {
     return true;
   }
 
-  bool write( const std::string& path, int32_t frameIndex ) {
+  bool write( const std::string &path, int32_t frameIndex ) {
     auto          filename = createFilename( path, frameIndex );
     std::ofstream file( filename, std::ios::out | std::ios::binary );
     if ( !file.is_open() ) { throw std::runtime_error( "Error: can't open: " + filename ); }
@@ -367,25 +334,25 @@ class Pointcloud {
     file << "end_header\n";
 
     std::array<float, 48> sh;
-    std::array<float, 3>  normal;
-    for ( const auto& data : gaussianData_ ) {
-      sh[0] = data.sh_[0][0];  
-      sh[1] = data.sh_[0][1];   
-      sh[2] = data.sh_[0][2];   
+    std::array<float, 3>  normal{};
+    for ( const auto &data : gaussianData_ ) {
+      sh[0] = data.sh_[0][0];
+      sh[1] = data.sh_[0][1];
+      sh[2] = data.sh_[0][2];
       for ( size_t sh_idx = 1; sh_idx < 16; ++sh_idx ) {
-        sh[3 + sh_idx - 1]  = data.sh_[sh_idx][0];  
-        sh[3 + sh_idx + 14] = data.sh_[sh_idx][1];   
-        sh[3 + sh_idx + 29] = data.sh_[sh_idx][2];  
+        sh[3 + sh_idx - 1]  = data.sh_[sh_idx][0];
+        sh[3 + sh_idx + 14] = data.sh_[sh_idx][1];
+        sh[3 + sh_idx + 29] = data.sh_[sh_idx][2];
       }
-      file.write( reinterpret_cast<const char*>( &data.xyz_ ), sizeof( data.xyz_ ) );
-      file.write( reinterpret_cast<const char*>( normal.data() ), sizeof( normal ) );
-      file.write( reinterpret_cast<const char*>( sh.data() ), sizeof( sh ) );
-      file.write( reinterpret_cast<const char*>( &data.opacity_ ), sizeof( data.opacity_ ) );
-      file.write( reinterpret_cast<const char*>( &data.scale_ ), sizeof( data.scale_ ) );
-      file.write( reinterpret_cast<const char*>( &data.rotate_[3] ), sizeof( data.rotate_[3] ) );
-      file.write( reinterpret_cast<const char*>( &data.rotate_[0] ), sizeof( data.rotate_[0] ) );
-      file.write( reinterpret_cast<const char*>( &data.rotate_[1] ), sizeof( data.rotate_[1] ) );
-      file.write( reinterpret_cast<const char*>( &data.rotate_[2] ), sizeof( data.rotate_[2] ) );
+      file.write( reinterpret_cast<const char *>( &data.xyz_ ), sizeof( data.xyz_ ) );
+      file.write( reinterpret_cast<const char *>( normal.data() ), sizeof( normal ) );
+      file.write( reinterpret_cast<const char *>( sh.data() ), sizeof( sh ) );
+      file.write( reinterpret_cast<const char *>( &data.opacity_ ), sizeof( data.opacity_ ) );
+      file.write( reinterpret_cast<const char *>( &data.scale_ ), sizeof( data.scale_ ) );
+      file.write( reinterpret_cast<const char *>( &data.rotate_[3] ), sizeof( data.rotate_[3] ) );
+      file.write( reinterpret_cast<const char *>( &data.rotate_[0] ), sizeof( data.rotate_[0] ) );
+      file.write( reinterpret_cast<const char *>( &data.rotate_[1] ), sizeof( data.rotate_[1] ) );
+      file.write( reinterpret_cast<const char *>( &data.rotate_[2] ), sizeof( data.rotate_[2] ) );
     }
     file.close();
     return true;
@@ -394,7 +361,7 @@ class Pointcloud {
   std::pair<glm::vec3, glm::vec3> getBoundingBox() {
     glm::vec4 minBound = gaussianData_[0].xyz_;
     glm::vec4 maxBound = gaussianData_[0].xyz_;
-    for ( const auto& data : gaussianData_ ) {
+    for ( const auto &data : gaussianData_ ) {
       minBound = glm::min( minBound, data.xyz_ );
       maxBound = glm::max( maxBound, data.xyz_ );
     }
@@ -406,7 +373,7 @@ class Pointcloud {
     size_t modulo = 10000;
     int    num = 10, idx = 0;
     for ( int32_t i = 0; i < size() && idx < num; i += modulo, idx++ ) {
-      auto& gs = gaussianData_[i];
+      auto &gs = gaussianData_[i];
       printf( "%7d: %6.2f %6.2f %6.2f ", i, gs.xyz_[0], gs.xyz_[1], gs.xyz_[2] );
       printf( "o: %6.2f ", gs.opacity_ );
       printf( "s: %6.2f %6.2f %6.2f ", gs.scale_[0], gs.scale_[1], gs.scale_[2] );
@@ -422,12 +389,11 @@ class Pointcloud {
     fflush( stdout );
   }
 
-  std::vector<uint32_t> sort( const glm::mat4& modelViewProj, const glm::vec2& nearFar, bool inverse = false ) const {
+  std::vector<uint32_t> sort( const glm::mat4 &modelViewProj, const glm::vec2 &nearFar, bool inverse = false ) const {
     int32_t               numPoints = size();
     int32_t               count     = 0;
     std::vector<float>    depth( numPoints );
     std::vector<uint32_t> index( numPoints );
-    const uint32_t        maxValue = std::numeric_limits<uint32_t>::max();
     for ( int32_t i = 0; i < numPoints; ++i ) {
       glm::vec4 p = modelViewProj * gaussianData_[i].xyz_;
       if ( p.z > nearFar.x && p.z < nearFar.y ) {

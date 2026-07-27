@@ -34,70 +34,155 @@
  */
 
 #include "rasterizer.hpp"
-#include "rasterizerSoftware.hpp"
-#if defined( USE_GLFW )
-#include "rasterizerHardware.hpp"
-#endif
+#include "camera.hpp"
+#include "pointcloud.hpp"
+#include "viewpoints.hpp"
 
-Rasterizer::Rasterizer( bool useSoftware ) {
-  useSoftware_ = useSoftware;
+namespace {
 
-#if defined( USE_GLFW )
-  if ( useSoftware_ ) {
-    rasterizerSoftware_ = std::make_unique<RasterizerSoftware>();
-  } else {
-    rasterizerHardware_ = std::make_unique<RasterizerHardware>();
+constexpr float kAlphaThreshold = 1.0f / 255.0f;
+
+template <typename T>
+T clamp( T value, T minimum, T maximum ) {
+  return value < minimum ? minimum : ( value > maximum ? maximum : value );
+}
+
+glm::mat3 quatToRotation( glm::quat q ) {
+  float xx = q.x * q.x, xy = q.x * q.y, xz = q.x * q.z;
+  float yy = q.y * q.y, yz = q.y * q.z, zz = q.z * q.z;
+  float wx = q.w * q.x, wy = q.w * q.y, wz = q.w * q.z;
+  return glm::transpose( glm::mat3( 1. - 2. * ( yy + zz ), 2. * ( xy - wz ), 2. * ( xz + wy ), 2. * ( xy + wz ),
+                                    1. - 2. * ( xx + zz ), 2. * ( yz - wx ), 2. * ( xz - wy ), 2. * ( yz + wx ),
+                                    1. - 2. * ( xx + yy ) ) );
+}
+
+glm::mat3 computeCovariance3D( glm::quat quat, glm::vec4 scale ) {
+  glm::mat3 R = quatToRotation( quat );
+  glm::mat3 M = glm::mat3( R[0] * scale.x, R[1] * scale.y, R[2] * scale.z );
+  return M * glm::transpose( M );
+}
+
+glm::mat2 computeCovariance2D( glm::vec3 mean, glm::mat3 covar, glm::mat3 viewMat, glm::vec2 focal, glm::vec2 window ) {
+  glm::vec2   center = window * 0.5f;
+  glm::vec2   limit  = 1.3f * center / focal;
+  float       rz     = 1.0f / mean.z;
+  float       rz2    = rz * rz;
+  glm::vec2   t      = mean.z * clamp( mean.xy() * rz, -limit, limit );
+  glm::mat3x2 J      = glm::mat3x2( -focal.x * rz, 0.0, 0.0, -focal.y * rz, -focal.x * t.x * rz2, focal.y * t.y * rz2 );
+  glm::mat3   cov    = viewMat * covar * glm::transpose( viewMat );
+  cov = glm::mat3( cov[0][0], -cov[0][1], -cov[0][2], -cov[1][0], cov[1][1], cov[1][2], -cov[2][0], cov[2][1],
+                   cov[2][2] );
+  return J * cov * transpose( J );
+}
+
+glm::vec3 computeConic( glm::mat2 covar2d, float &radius ) {
+  covar2d[0][0] += 0.3;
+  covar2d[1][1] += 0.3;
+  float det = std::max( covar2d[0][0] * covar2d[1][1] - covar2d[0][1] * covar2d[1][0], 1e-10f );
+  float b   = 0.5f * ( covar2d[0][0] + covar2d[1][1] );
+  float s   = sqrt( std::max( b * b - det, 0.1f ) );
+  radius    = ceil( 3.0 * sqrt( std::max( b - s, b + s ) ) );
+  return glm::vec3( covar2d[1][1] / det, -( covar2d[0][1] + covar2d[1][0] ) / ( 2.0 * det ), covar2d[0][0] / det );
+}
+
+void accumulateTransmittanceSums( const Pointcloud            &pc,
+                                  const glm::mat4             &viewMatrix,
+                                  const glm::mat4             &projectionMatrix,
+                                  const glm::vec2             &focal,
+                                  const glm::vec2             &window,
+                                  const glm::vec2             &halfWindow,
+                                  const std::vector<uint32_t> &sorted,
+                                  std::vector<float>          &transmittanceSums ) {
+  const int32_t        width  = static_cast<int32_t>( window.x );
+  const int32_t        height = static_cast<int32_t>( window.y );
+  std::vector<float>   transmittance( static_cast<size_t>( width ) * static_cast<size_t>( height ), 1.0f );
+  std::vector<uint8_t> done( static_cast<size_t>( width ) * static_cast<size_t>( height ), 0 );
+  const glm::mat3      viewMatrix3( viewMatrix );
+
+  for ( const auto &pointIndex : sorted ) {
+    float       radius;
+    const auto &gaussian     = pc[pointIndex];
+    glm::vec4   viewPosition = viewMatrix * gaussian.xyz_;
+    glm::vec4   clipPosition = projectionMatrix * viewPosition;
+    glm::vec2   normalizedPosition( clipPosition.x / clipPosition.w, clipPosition.y / clipPosition.w );
+    glm::mat3   covariance3D = computeCovariance3D( gaussian.rotate_, gaussian.scale_ );
+    glm::mat2   covariance2D = computeCovariance2D( viewPosition.xyz(), covariance3D, viewMatrix3, focal, window );
+    glm::vec3   conic        = computeConic( covariance2D, radius );
+    glm::vec2   screen       = halfWindow * normalizedPosition + halfWindow;
+    float       opacity      = gaussian.opacity_;
+    if ( opacity <= kAlphaThreshold ) continue;
+
+    float       sigmaThreshold = std::log( opacity / kAlphaThreshold );
+    const float sigmaXX        = 0.5f * conic.x;
+    const float sigmaYY        = 0.5f * conic.z;
+    const float sigmaXY        = -conic.y;
+    float       radiusU        = radius;
+    float       radiusV        = radius;
+    float       determinant    = sigmaXX * sigmaYY - 0.25f * sigmaXY * sigmaXY;
+    if ( determinant > 1e-10f ) {
+      radiusU = std::min( radiusU, std::sqrt( std::max( sigmaThreshold * sigmaYY / determinant, 0.0f ) ) );
+      radiusV = std::min( radiusV, std::sqrt( std::max( sigmaThreshold * sigmaXX / determinant, 0.0f ) ) );
+    }
+
+    int32_t minimumU = std::max( static_cast<int32_t>( std::floor( screen.x - radiusU ) ), 0 );
+    int32_t minimumV = std::max( static_cast<int32_t>( std::floor( screen.y - radiusV ) ), 0 );
+    int32_t maximumU = std::min( static_cast<int32_t>( std::ceil( screen.x + radiusU ) ), width - 1 );
+    int32_t maximumV = std::min( static_cast<int32_t>( std::ceil( screen.y + radiusV ) ), height - 1 );
+
+    for ( int32_t vertical = minimumV; vertical <= maximumV; ++vertical ) {
+      size_t row           = static_cast<size_t>( vertical ) * static_cast<size_t>( width );
+      float  deltaY        = screen.y - static_cast<float>( vertical + 0.5f );
+      float  rowCross      = sigmaXY * deltaY;
+      float  rowQuadratic  = sigmaYY * deltaY * deltaY;
+      float  initialDeltaX = screen.x - static_cast<float>( minimumU + 0.5f );
+      float  sigma         = sigmaXX * initialDeltaX * initialDeltaX + rowCross * initialDeltaX + rowQuadratic;
+      float  sigmaDelta    = -2.0f * sigmaXX * initialDeltaX + sigmaXX - rowCross;
+
+      for ( int32_t horizontal = minimumU; horizontal <= maximumU; ++horizontal ) {
+        size_t pixelIndex = row + static_cast<size_t>( horizontal );
+        float  sigmaValue = sigma;
+        sigma += sigmaDelta;
+        sigmaDelta += 2.0f * sigmaXX;
+        if ( done[pixelIndex] != 0 || sigmaValue < 0.0f || sigmaValue > sigmaThreshold ) continue;
+
+        float alpha = std::min( static_cast<float>( opacity * std::exp( -sigmaValue ) ), 0.999f );
+        if ( alpha < kAlphaThreshold ) continue;
+
+        float currentTransmittance = transmittance[pixelIndex];
+        float nextTransmittance    = currentTransmittance * ( 1.0f - alpha );
+        if ( nextTransmittance <= 1e-4f ) {
+          done[pixelIndex] = 1;
+        } else {
+          float visibility = alpha * currentTransmittance;
+          transmittanceSums[pointIndex] += visibility * visibility;
+          transmittance[pixelIndex] = nextTransmittance;
+        }
+      }
+    }
   }
-#else
-  rasterizerSoftware_ = std::make_unique<RasterizerSoftware>();
-#endif
-}
-Rasterizer::~Rasterizer() {
-  rasterizerSoftware_.reset();
-#if defined( USE_GLFW )
-  rasterizerHardware_.reset();
-#endif
 }
 
-template <typename T, int32_t N>
-void Rasterizer::render( const Pointcloud&  pc,
-                         const Viewpoint&   viewpoint,
-                         Image<T, N>&       image,
-                         Image<uint8_t, 1>& ocm ) {
-#if defined( USE_GLFW )
-  if ( useSoftware_ )
-    rasterizerSoftware_->render( pc, viewpoint, image, ocm );
-  else
-    rasterizerHardware_->render( pc, viewpoint, image, ocm );
-#else
-  rasterizerSoftware_->render( pc, viewpoint, image, ocm );
-#endif
-}
+}  // namespace
 
-void Rasterizer::computeTransmittanceSums( const Pointcloud&  pc,
-                                           const Viewpoint&   viewpoint,
-                                           std::vector<float>& transSums ) {
-#if defined( USE_GLFW )
-  if ( useSoftware_ ) {
-    rasterizerSoftware_->computeTransmittanceSums( pc, viewpoint, transSums );
-  } else {
-    printf( "Error: computeTransmittanceSums is only supported by the software rasterizer.\n" );
-    std::abort();
-  }
-#else
-  rasterizerSoftware_->computeTransmittanceSums( pc, viewpoint, transSums );
-#endif
-}
+void Rasterizer::computeTransmittanceSums( const Pointcloud   &pc,
+                                           const Viewpoint    &viewpoint,
+                                           std::vector<float> &transmittanceSums ) {
+  int32_t width  = viewpoint.originalWidth();
+  int32_t height = viewpoint.originalHeight();
+  auto    focal  = viewpoint.getAdjustedFocal( height );
 
-template void Rasterizer::render<uint8_t>( Pointcloud const&,
-                                           const Viewpoint&,
-                                           Image<uint8_t, 3>&,
-                                           Image<uint8_t, 1>& );
-template void Rasterizer::render<uint16_t>( Pointcloud const&,
-                                            const Viewpoint&,
-                                            Image<uint16_t, 3>&,
-                                            Image<uint8_t, 1>& );
-template void Rasterizer::render<float>( Pointcloud const&,
-                                         const Viewpoint&,
-                                         Image<float, 3>&,
-                                         Image<uint8_t, 1>& );
+  float  fov = 2.0f * atan( 1.0f / ( 2.0f * focal[1] / static_cast<float>( height ) ) );
+  Camera camera;
+  camera.create( 10.0f, fov );
+  camera.initialize( width, height );
+  camera.setLookAt( viewpoint.pos(), viewpoint.view(), viewpoint.up() );
+
+  glm::mat4       viewMatrix       = camera.viewMat();
+  auto            projectionMatrix = camera.projMat();
+  auto            nearFar          = camera.nearFar();
+  const glm::vec2 window( width, height );
+  const glm::vec2 halfWindow( width * 0.5f, height * 0.5f );
+  auto            sorted = pc.sort( projectionMatrix * viewMatrix, nearFar, true );
+
+  accumulateTransmittanceSums( pc, viewMatrix, projectionMatrix, focal, window, halfWindow, sorted, transmittanceSums );
+}

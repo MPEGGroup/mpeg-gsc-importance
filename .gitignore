@@ -1,9 +1,3 @@
 /build/
 /dependencies/glm
-/dependencies/glfw
-/dependencies/fmtlib
-
-# template
-*.rgb
 *.ply
-*.mp4

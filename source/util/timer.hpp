@@ -43,9 +43,9 @@ class Timer {
                      std::chrono::nanoseconds>
       TicToc;
 
-  void tic( const std::string& name ) {
+  void tic( const std::string &name ) {
     auto it = std::find_if( m_ticTocList.begin(), m_ticTocList.end(),
-                            [&name]( const TicToc& element ) { return std::get<0>( element ) == name; } );
+                            [&name]( const TicToc &element ) { return std::get<0>( element ) == name; } );
 
     auto start = std::chrono::steady_clock::now();
     if ( it != m_ticTocList.end() ) {
@@ -55,9 +55,9 @@ class Timer {
     }
   }
 
-  void toc( const std::string& name, const bool verbose = true ) {
+  void toc( const std::string &name, const bool verbose = true ) {
     auto it = std::find_if( m_ticTocList.begin(), m_ticTocList.end(),
-                            [&name]( const TicToc& element ) { return std::get<0>( element ) == name; } );
+                            [&name]( const TicToc &element ) { return std::get<0>( element ) == name; } );
 
     if ( it != m_ticTocList.end() ) {
       auto end      = std::chrono::steady_clock::now();
@@ -72,16 +72,16 @@ class Timer {
     }
   }
 
-  void reset( const std::string& name ) {
+  void reset( const std::string &name ) {
     auto it = std::find_if( m_ticTocList.begin(), m_ticTocList.end(),
-                            [&name]( const TicToc& element ) { return std::get<0>( element ) == name; } );
+                            [&name]( const TicToc &element ) { return std::get<0>( element ) == name; } );
 
     if ( it != m_ticTocList.end() ) { std::get<2>( *it ) = std::chrono::nanoseconds( 0 ); }
   }
 
-  double getTime( const std::string& name ) const {
+  double getTime( const std::string &name ) const {
     auto it = std::find_if( m_ticTocList.begin(), m_ticTocList.end(),
-                            [&name]( const TicToc& element ) { return std::get<0>( element ) == name; } );
+                            [&name]( const TicToc &element ) { return std::get<0>( element ) == name; } );
 
     if ( it != m_ticTocList.end() ) {
       return ( std::get<2>( *it ) == std::chrono::nanoseconds::max() )
@@ -93,7 +93,7 @@ class Timer {
 
   void trace() const {
     std::cout << "Duration: \n";
-    for ( const auto& el : m_ticTocList ) {
+    for ( const auto &el : m_ticTocList ) {
       std::cout << "  " << std::left << std::setw( 25 ) << std::get<0>( el ) << ": time = " << std::right
                 << std::setw( 15 )
                 << ( std::get<2>( el ) == std::chrono::nanoseconds::max()

@@ -35,19 +35,20 @@
 #pragma once
 
 #include "common.hpp"
-#include "camera.hpp"
-#include "pointcloud.hpp"
-
-class GLFWwindow;
 
 class Viewpoint {
  public:
-  void set( glm::vec3 pos, glm::vec3 view, glm::vec3 up, glm::vec2 focal, int32_t originalWidth, int32_t originalHeight ) {
-    pos_ = pos;
-    view_ = view;
-    up_ = up;
-    focal_ = focal;
-    originalWidth_ = originalWidth;
+  void set( glm::vec3 pos,
+            glm::vec3 view,
+            glm::vec3 up,
+            glm::vec2 focal,
+            int32_t   originalWidth,
+            int32_t   originalHeight ) {
+    pos_            = pos;
+    view_           = view;
+    up_             = up;
+    focal_          = focal;
+    originalWidth_  = originalWidth;
     originalHeight_ = originalHeight;
   }
 
@@ -58,9 +59,9 @@ class Viewpoint {
   auto originalWidth() const { return originalWidth_; }
   auto originalHeight() const { return originalHeight_; }
 
-  glm::vec2 getAdjustedFocal(int32_t currentHeight) const {
-    if (originalHeight_ > 0) {
-      float scale = static_cast<float>(currentHeight) / static_cast<float>(originalHeight_);
+  glm::vec2 getAdjustedFocal( int32_t currentHeight ) const {
+    if ( originalHeight_ > 0 ) {
+      float scale = static_cast<float>( currentHeight ) / static_cast<float>( originalHeight_ );
       return focal_ * scale;
     }
     return focal_;
@@ -79,16 +80,21 @@ class Viewpoint {
   glm::vec3 view_;
   glm::vec3 up_;
   glm::vec2 focal_;
-  int32_t originalWidth_ = 0;
-  int32_t originalHeight_ = 0;
+  int32_t   originalWidth_  = 0;
+  int32_t   originalHeight_ = 0;
 };
 
 class Viewpoints {
  public:
-  Viewpoints() { instance_ = this; }
+  Viewpoints()  = default;
   ~Viewpoints() = default;
 
-  void create( int numPoints, glm::vec3 center, float radius = 5.f, float focal = 2000.f, int32_t originalWidth = 0, int32_t originalHeight = 0 ) {
+  void create( int       numPoints,
+               glm::vec3 center,
+               float     radius         = 5.f,
+               float     focal          = 2000.f,
+               int32_t   originalWidth  = 0,
+               int32_t   originalHeight = 0 ) {
     viewpoints_.resize( numPoints );
     if ( numPoints == 1 ) {
       viewpoints_[0].set( center + glm::vec3( radius, 0.0f, 0.0f ), center, glm::vec3( 0.0f, 1.0f, 0.0f ),
@@ -117,17 +123,17 @@ class Viewpoints {
   auto             end() { return viewpoints_.end(); }
   auto             begin() const { return viewpoints_.cbegin(); }
   auto             end() const { return viewpoints_.cend(); }
-  Viewpoint&       operator[]( int32_t index ) { return viewpoints_[index]; }
-  const Viewpoint& operator[]( int32_t index ) const { return viewpoints_[index]; }
+  Viewpoint       &operator[]( int32_t index ) { return viewpoints_[index]; }
+  const Viewpoint &operator[]( int32_t index ) const { return viewpoints_[index]; }
 
-  void write( const std::string& filename ) const {
+  void write( const std::string &filename ) const {
     std::ofstream file( filename );
     if ( !file.is_open() ) {
       std::cerr << "Error : can't open: " << filename << "\n";
       return;
     }
     file << viewpoints_.size() << "\n";
-    for ( const auto& el : viewpoints_ ) {
+    for ( const auto &el : viewpoints_ ) {
       file << el.pos().x << " " << el.pos().y << " " << el.pos().z << " ";
       file << el.view().x << " " << el.view().y << " " << el.view().z << " ";
       file << el.up().x << " " << el.up().y << " " << el.up().z << "\n";
@@ -137,7 +143,7 @@ class Viewpoints {
     file.close();
   }
 
-  void read( const std::string& filename ) {
+  void read( const std::string &filename ) {
     std::ifstream file( filename );
     if ( !file.is_open() ) {
       std::cerr << "Error : can't open: " << filename << "\n";
@@ -146,10 +152,10 @@ class Viewpoints {
     int numPoints = 0;
     file >> numPoints;
     viewpoints_.resize( numPoints );
-    for ( auto& el : viewpoints_ ) {
+    for ( auto &el : viewpoints_ ) {
       glm::vec3 pos, view, up;
       glm::vec2 focal;
-      int32_t originalWidth, originalHeight;
+      int32_t   originalWidth, originalHeight;
       file >> pos.x >> pos.y >> pos.z;
       file >> view.x >> view.y >> view.z;
       file >> up.x >> up.y >> up.z;
@@ -162,25 +168,9 @@ class Viewpoints {
 
   void trace() {
     printf( "Viewpoints[ %4zu ]: \n", size() );
-    for ( auto& el : viewpoints_ ) { el.trace(); }
+    for ( auto &el : viewpoints_ ) { el.trace(); }
   }
 
-  void        display( const Pointcloud& pc, int width, int height );
-  static void mouseCallback( GLFWwindow* window, double xpos, double ypos );
-  static void scrollCallback( GLFWwindow* window, double xoffset, double yoffset );
-  static void keyCallback( GLFWwindow* window, int key, int scancode, int action, int mods );
-
  private:
-  std::vector<Viewpoint>      viewpoints_;
-  std::vector<CameraPosition> cameraPosition_;
-  Camera                      camera_;
-  static Viewpoints*          instance_;
-  float                       lastX_;
-  float                       lastY_;
-  bool                        firstMouse_     = true;
-  int32_t                     viewpointIndex_ = 0;
-  int32_t                     cameraIndex_    = 0;
-  glm::vec2                   focal_          = glm::vec2( 2000.f, 2000.f );
-  int32_t                     originalWidth_  = 0;
-  int32_t                     originalHeight_ = 0;
+  std::vector<Viewpoint> viewpoints_;
 };
