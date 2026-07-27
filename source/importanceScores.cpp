@@ -147,7 +147,7 @@ struct Parameters {
 };
 
 int main( int32_t argc, char *argv[] ) {
-  printf( "MPEG GSC metric version %s \n", ::gscm::version );
+  printf( "MPEG GSC importance version %s \n", ::gscm::version );
   printf( "Computing importance scores from views\n" );
   fflush( stdout );
 
