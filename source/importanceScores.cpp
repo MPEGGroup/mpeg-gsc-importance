@@ -58,9 +58,10 @@ Viewpoint makeDownscaledViewpoint( const Viewpoint &viewpoint, float downscaleFa
   int32_t newHeight =
       std::max( static_cast<int32_t>( std::round( static_cast<double>( originalHeight ) * ratio ) ), 1 );
   glm::vec2 newFocal = viewpoint.focal() * ratio;
+  glm::vec2 newCenter = viewpoint.center() * ratio;
 
   Viewpoint scaled;
-  scaled.set( viewpoint.pos(), viewpoint.view(), viewpoint.up(), newFocal, newWidth, newHeight );
+  scaled.set( viewpoint.pos(), viewpoint.view(), viewpoint.up(), newFocal, newWidth, newHeight, newCenter );
   return scaled;
 }
 
@@ -186,7 +187,7 @@ int main( int32_t argc, char *argv[] ) {
       viewpoints.resize( cameraPosition.size() );
       for ( size_t i = 0; i < cameraPosition.size(); i++ ) {
         const auto &el = cameraPosition[i];
-        viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_ );
+        viewpoints[i].set( el.pos(), el.view(), el.up(), el.focal_, el.width_, el.height_, el.center_ );
         if ( params.verbose_ ) el.log();
       }
     }

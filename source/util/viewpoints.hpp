@@ -43,11 +43,13 @@ class Viewpoint {
             glm::vec3 up,
             glm::vec2 focal,
             int32_t   originalWidth,
-            int32_t   originalHeight ) {
+            int32_t   originalHeight,
+            glm::vec2 center = glm::vec2( 0.0f ) ) {
     pos_            = pos;
     view_           = view;
     up_             = up;
     focal_          = focal;
+    center_         = center;
     originalWidth_  = originalWidth;
     originalHeight_ = originalHeight;
   }
@@ -56,6 +58,7 @@ class Viewpoint {
   auto view() const { return view_; }
   auto up() const { return up_; }
   auto focal() const { return focal_; }
+  auto center() const { return center_; }
   auto originalWidth() const { return originalWidth_; }
   auto originalHeight() const { return originalHeight_; }
 
@@ -72,6 +75,7 @@ class Viewpoint {
     printf( "view = %12.8f %12.8f %12.8f ", view_.x, view_.y, view_.z );
     printf( "up = %12.8f %12.8f %12.8f ", up_.x, up_.y, up_.z );
     printf( "focal = %12.8f %12.8f ", focal_.x, focal_.y );
+    printf( "center = %12.8f %12.8f ", center_.x, center_.y );
     printf( "original = %dx%d \n", originalWidth_, originalHeight_ );
   }
 
@@ -80,6 +84,7 @@ class Viewpoint {
   glm::vec3 view_;
   glm::vec3 up_;
   glm::vec2 focal_;
+  glm::vec2 center_;
   int32_t   originalWidth_  = 0;
   int32_t   originalHeight_ = 0;
 };
@@ -138,6 +143,7 @@ class Viewpoints {
       file << el.view().x << " " << el.view().y << " " << el.view().z << " ";
       file << el.up().x << " " << el.up().y << " " << el.up().z << "\n";
       file << el.focal().x << " " << el.focal().y << "\n";
+      file << el.center().x << " " << el.center().y << "\n";
       file << el.originalWidth() << " " << el.originalHeight() << "\n";
     }
     file.close();
@@ -155,13 +161,15 @@ class Viewpoints {
     for ( auto &el : viewpoints_ ) {
       glm::vec3 pos, view, up;
       glm::vec2 focal;
+      glm::vec2 center;
       int32_t   originalWidth, originalHeight;
       file >> pos.x >> pos.y >> pos.z;
       file >> view.x >> view.y >> view.z;
       file >> up.x >> up.y >> up.z;
       file >> focal.x >> focal.y;
+      file >> center.x >> center.y;
       file >> originalWidth >> originalHeight;
-      el.set( pos, view, up, focal, originalWidth, originalHeight );
+      el.set( pos, view, up, focal, originalWidth, originalHeight, center );
     }
     file.close();
   }

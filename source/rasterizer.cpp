@@ -169,20 +169,37 @@ void Rasterizer::computeTransmittanceSums( const Pointcloud   &pc,
                                            std::vector<float> &transmittanceSums ) {
   int32_t width  = viewpoint.originalWidth();
   int32_t height = viewpoint.originalHeight();
-  auto    focal  = viewpoint.getAdjustedFocal( height );
+  auto    focal  = viewpoint.focal();
+  auto    center = viewpoint.center();
+  if ( viewpoint.originalHeight() > 0 ) {
+    float scale = static_cast<float>( height ) / static_cast<float>( viewpoint.originalHeight() );
+    focal       = focal * scale;
+    center      = center * scale;
+  }
 
-  float  fov = 2.0f * atan( 1.0f / ( 2.0f * focal[1] / static_cast<float>( height ) ) );
   Camera camera;
-  camera.create( 10.0f, fov );
   camera.initialize( width, height );
   camera.setLookAt( viewpoint.pos(), viewpoint.view(), viewpoint.up() );
 
-  glm::mat4       viewMatrix       = camera.viewMat();
-  auto            projectionMatrix = camera.projMat();
+  float     zNear = 0.01f, zFar = 10000000000.0f;
+  glm::mat4 projMatrix;
+  if ( center.x > 0.0f && center.y > 0.0f && focal.x > 0.0f && focal.y > 0.0f ) {
+    float left  = -zNear * center.x / focal.x;
+    float right = zNear * ( static_cast<float>( width ) - center.x ) / focal.x;
+    float bottom = -zNear * ( static_cast<float>( height ) - center.y ) / focal.y;
+    float top    = zNear * center.y / focal.y;
+    projMatrix = glm::frustum( left, right, bottom, top, zNear, zFar );
+  } else {
+    float fov = 2.0f * atan( 1.0f / ( 2.0f * focal[1] / static_cast<float>( height ) ) );
+    camera.create( 10.0f, fov );
+    projMatrix = camera.projMat();
+  }
+
+  glm::mat4       viewMatrix = camera.viewMat();
   auto            nearFar          = camera.nearFar();
   const glm::vec2 window( width, height );
   const glm::vec2 halfWindow( width * 0.5f, height * 0.5f );
-  auto            sorted = pc.sort( projectionMatrix * viewMatrix, nearFar, true );
+  auto            sorted = pc.sort( projMatrix * viewMatrix, nearFar, true );
 
-  accumulateTransmittanceSums( pc, viewMatrix, projectionMatrix, focal, window, halfWindow, sorted, transmittanceSums );
+  accumulateTransmittanceSums( pc, viewMatrix, projMatrix, focal, window, halfWindow, sorted, transmittanceSums );
 }
