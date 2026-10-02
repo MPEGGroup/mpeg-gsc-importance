@@ -15,6 +15,12 @@ add_executable(importance-scores
 
 add_dependencies(importance-scores genversion)
 
+if(MSVC)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /fp:strict")
+elseif(NOT APPLE)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-tree-vectorize -fno-fast-math -ffp-contract=off -msse4.1")
+endif()
+
 target_include_directories(importance-scores PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/util

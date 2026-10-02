@@ -280,12 +280,12 @@ class Pointcloud {
           pSh[j]   = sh;
         }
 
-        dst.opacity_ = 1.0 / ( 1.0 + exp( -pCast[k]( pC.data() + pIndex[k] ) ) );  // o
+        dst.opacity_ = 1.0 / ( 1.0 + deterministic_exp( -pCast[k]( pC.data() + pIndex[k] ) ) );  // o
         k++;
 
-        dst.scale_ = glm::vec4( exp( pCast[k + 0]( pC.data() + pIndex[k + 0] ) ),       // scale 0
-                                exp( pCast[k + 1]( pC.data() + pIndex[k + 1] ) ),       // scale 1
-                                exp( pCast[k + 2]( pC.data() + pIndex[k + 2] ) ), 0 );  // scale 2
+          dst.scale_ = glm::vec4( deterministic_exp( pCast[k + 0]( pC.data() + pIndex[k + 0] ) ),       // scale 0
+                  deterministic_exp( pCast[k + 1]( pC.data() + pIndex[k + 1] ) ),       // scale 1
+                  deterministic_exp( pCast[k + 2]( pC.data() + pIndex[k + 2] ) ), 0 );  // scale 2
         k += 3;
 
         float qw    = pCast[k + 0]( pC.data() + pIndex[k + 0] );
@@ -406,9 +406,9 @@ class Pointcloud {
     std::vector<uint32_t> indices( count );
     std::iota( indices.begin(), indices.end(), 0 );
     if ( inverse )
-      std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] < depth[b]; } );
+      std::stable_sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] < depth[b]; } );
     else
-      std::sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] > depth[b]; } );
+      std::stable_sort( indices.begin(), indices.end(), [&]( uint32_t a, uint32_t b ) { return depth[a] > depth[b]; } );
     std::vector<uint32_t> sorted( count );
     std::transform( indices.begin(), indices.end(), sorted.begin(), [&]( uint32_t idx ) { return index[idx]; } );
     return sorted;

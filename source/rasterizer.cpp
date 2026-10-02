@@ -38,9 +38,48 @@
 #include "pointcloud.hpp"
 #include "viewpoints.hpp"
 
+#include <smmintrin.h>
+
 namespace {
 
 constexpr float kAlphaThreshold = 1.0f / 255.0f;
+
+inline float deterministic_sqrt(float x) {
+  __m128 v = _mm_set_ss(x);
+  return _mm_cvtss_f32(_mm_sqrt_ss(v));
+}
+
+inline float deterministic_ceil(float x) {
+  __m128 v = _mm_set_ss(x);
+  return _mm_cvtss_f32(_mm_round_ss(v, v, _MM_FROUND_TO_POS_INF | _MM_FROUND_NO_EXC));
+}
+
+inline float deterministic_floor(float x) {
+  __m128 v = _mm_set_ss(x);
+  return _mm_cvtss_f32(_mm_round_ss(v, v, _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC));
+}
+
+inline float deterministic_log(float x) {
+  if (x <= 0.0f) return -87.3365f;
+  uint32_t ix;
+  std::memcpy(&ix, &x, sizeof(float));
+  int iexp = static_cast<int>((ix >> 23) & 0xFF) - 126;
+  uint32_t mx = (ix & 0x007FFFFF) | 0x3F000000;
+  float luxury_u;
+  std::memcpy(&luxury_u, &mx, sizeof(float));
+  float s = (luxury_u - 1.0f) / (luxury_u + 1.0f);
+  float s2 = s * s;
+  float r = s * (2.0000000f + s2 * (0.6666667f + s2 * (0.4000000f + s2 * 0.2857143f)));
+  return r + static_cast<float>(iexp) * 0.69314718f;
+}
+
+inline glm::vec3 deterministic_normalize(const glm::vec3& v) {
+  float lenSq = v.x * v.x + v.y * v.y + v.z * v.z;
+  if (lenSq > 0.0f) {
+    return v * (1.0f / deterministic_sqrt(lenSq));
+  }
+  return v;
+}
 
 template <typename T>
 T clamp( T value, T minimum, T maximum ) {
@@ -80,8 +119,8 @@ glm::vec3 computeConic( glm::mat2 covar2d, float &radius ) {
   covar2d[1][1] += 0.3;
   float det = std::max( covar2d[0][0] * covar2d[1][1] - covar2d[0][1] * covar2d[1][0], 1e-10f );
   float b   = 0.5f * ( covar2d[0][0] + covar2d[1][1] );
-  float s   = sqrt( std::max( b * b - det, 0.1f ) );
-  radius    = ceil( 3.0 * sqrt( std::max( b - s, b + s ) ) );
+  float s   = deterministic_sqrt( std::max( b * b - det, 0.1f ) );
+  radius    = deterministic_ceil( 3.0f * deterministic_sqrt( std::max( b - s, b + s ) ) );
   return glm::vec3( covar2d[1][1] / det, -( covar2d[0][1] + covar2d[1][0] ) / ( 2.0 * det ), covar2d[0][0] / det );
 }
 
@@ -112,7 +151,7 @@ void accumulateTransmittanceSums( const Pointcloud            &pc,
     float       opacity      = gaussian.opacity_;
     if ( opacity <= kAlphaThreshold ) continue;
 
-    float       sigmaThreshold = std::log( opacity / kAlphaThreshold );
+    float       sigmaThreshold = deterministic_log( opacity / kAlphaThreshold );
     const float sigmaXX        = 0.5f * conic.x;
     const float sigmaYY        = 0.5f * conic.z;
     const float sigmaXY        = -conic.y;
@@ -120,14 +159,14 @@ void accumulateTransmittanceSums( const Pointcloud            &pc,
     float       radiusV        = radius;
     float       determinant    = sigmaXX * sigmaYY - 0.25f * sigmaXY * sigmaXY;
     if ( determinant > 1e-10f ) {
-      radiusU = std::min( radiusU, std::sqrt( std::max( sigmaThreshold * sigmaYY / determinant, 0.0f ) ) );
-      radiusV = std::min( radiusV, std::sqrt( std::max( sigmaThreshold * sigmaXX / determinant, 0.0f ) ) );
+      radiusU = std::min( radiusU, deterministic_sqrt( std::max( sigmaThreshold * sigmaYY / determinant, 0.0f ) ) );
+      radiusV = std::min( radiusV, deterministic_sqrt( std::max( sigmaThreshold * sigmaXX / determinant, 0.0f ) ) );
     }
 
-    int32_t minimumU = std::max( static_cast<int32_t>( std::floor( screen.x - radiusU ) ), 0 );
-    int32_t minimumV = std::max( static_cast<int32_t>( std::floor( screen.y - radiusV ) ), 0 );
-    int32_t maximumU = std::min( static_cast<int32_t>( std::ceil( screen.x + radiusU ) ), width - 1 );
-    int32_t maximumV = std::min( static_cast<int32_t>( std::ceil( screen.y + radiusV ) ), height - 1 );
+    int32_t minimumU = std::max( static_cast<int32_t>( deterministic_floor( screen.x - radiusU ) ), 0 );
+    int32_t minimumV = std::max( static_cast<int32_t>( deterministic_floor( screen.y - radiusV ) ), 0 );
+    int32_t maximumU = std::min( static_cast<int32_t>( deterministic_ceil( screen.x + radiusU ) ), width - 1 );
+    int32_t maximumV = std::min( static_cast<int32_t>( deterministic_ceil( screen.y + radiusV ) ), height - 1 );
 
     for ( int32_t vertical = minimumV; vertical <= maximumV; ++vertical ) {
       size_t row           = static_cast<size_t>( vertical ) * static_cast<size_t>( width );
@@ -145,7 +184,7 @@ void accumulateTransmittanceSums( const Pointcloud            &pc,
         sigmaDelta += 2.0f * sigmaXX;
         if ( done[pixelIndex] != 0 || sigmaValue < 0.0f || sigmaValue > sigmaThreshold ) continue;
 
-        float alpha = std::min( static_cast<float>( opacity * std::exp( -sigmaValue ) ), 0.999f );
+        float alpha = std::min( opacity * deterministic_exp( -sigmaValue ), 0.999f );
         if ( alpha < kAlphaThreshold ) continue;
 
         float currentTransmittance = transmittance[pixelIndex];
@@ -176,30 +215,41 @@ void Rasterizer::computeTransmittanceSums( const Pointcloud   &pc,
     focal       = focal * scale;
     center      = center * scale;
   }
-
+  
   Camera camera;
   camera.initialize( width, height );
-  camera.setLookAt( viewpoint.pos(), viewpoint.view(), viewpoint.up() );
+
+  glm::vec3 deterministic_dir = viewpoint.view() - viewpoint.pos();
+  glm::vec3 f = deterministic_normalize(deterministic_dir);
+  glm::vec3 s = deterministic_normalize(glm::cross(f, viewpoint.up()));
+  glm::vec3 u = glm::cross(s, f);
 
   float     zNear = 0.01f, zFar = 10000000000.0f;
-  glm::mat4 projMatrix;
+  glm::mat4 projMat;
   if ( center.x > 0.0f && center.y > 0.0f && focal.x > 0.0f && focal.y > 0.0f ) {
     float left  = -zNear * center.x / focal.x;
     float right = zNear * ( static_cast<float>( width ) - center.x ) / focal.x;
     float bottom = -zNear * ( static_cast<float>( height ) - center.y ) / focal.y;
     float top    = zNear * center.y / focal.y;
-    projMatrix = glm::frustum( left, right, bottom, top, zNear, zFar );
+    projMat = glm::frustum( left, right, bottom, top, zNear, zFar );
   } else {
     float fov = 2.0f * atan( 1.0f / ( 2.0f * focal[1] / static_cast<float>( height ) ) );
     camera.create( 10.0f, fov );
-    projMatrix = camera.projMat();
+    projMat = camera.projMat();
   }
 
-  glm::mat4       viewMatrix = camera.viewMat();
+  glm::mat4 viewMat(1.0f);
+  viewMat[0][0] = s.x;  viewMat[1][0] = s.y;  viewMat[2][0] = s.z;
+  viewMat[0][1] = u.x;  viewMat[1][1] = u.y;  viewMat[2][1] = u.z;
+  viewMat[0][2] = -f.x; viewMat[1][2] = -f.y; viewMat[2][2] = -f.z;
+  viewMat[3][0] = -glm::dot(s, viewpoint.pos());
+  viewMat[3][1] = -glm::dot(u, viewpoint.pos());
+  viewMat[3][2] =  glm::dot(f, viewpoint.pos());
+
   auto            nearFar          = camera.nearFar();
   const glm::vec2 window( width, height );
   const glm::vec2 halfWindow( width * 0.5f, height * 0.5f );
-  auto            sorted = pc.sort( projMatrix * viewMatrix, nearFar, true );
+  auto            sorted = pc.sort( projMat * viewMat, nearFar, true );
 
-  accumulateTransmittanceSums( pc, viewMatrix, projMatrix, focal, window, halfWindow, sorted, transmittanceSums );
+  accumulateTransmittanceSums( pc, viewMat, projMat, focal, window, halfWindow, sorted, transmittanceSums );
 }
