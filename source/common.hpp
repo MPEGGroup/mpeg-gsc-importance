@@ -39,6 +39,7 @@
 #define _USE_MATH_DEFINES
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -138,7 +139,13 @@ inline float deterministic_exp(float x) {
     p = p * r + 0.5f;
     p = p * r + 1.0f;
     p = p * r + 1.0f;
-    p = std::ldexp(p, k);
+    if (k > -126 && k < 128) {
+      static_assert(std::numeric_limits<float>::is_iec559);
+      uint32_t exponentBits = static_cast<uint32_t>(k + 127) << 23;
+      p = p * std::bit_cast<float>(exponentBits);
+    } else {
+      p = std::ldexp(p, k);
+    }
     return std::max(p, 0.0f);
 }
 
